@@ -167,4 +167,111 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertTrue(csv.contains("S1"))
         XCTAssertTrue(csv.contains("1000"))
     }
-}
+    
+    // MARK: - Polygon Room Tests
+    
+    func testPolygonRoomArea() {
+        // Test square polygon
+        let squarePoints = [
+            RoomPoint(x: 0, y: 0),
+            RoomPoint(x: 1000, y: 0),
+            RoomPoint(x: 1000, y: 1000),
+            RoomPoint(x: 0, y: 1000)
+        ]
+        
+        let squareRoom = RoomSettings(
+            lengthMm: 1000,
+            widthMm: 1000,
+            expansionGapMm: 10,
+            shape: .polygon,
+            polygonPoints: squarePoints
+        )
+        
+        // Area should be 1,000,000 mm² = 1.0 m²
+        XCTAssertEqual(squareRoom.grossAreaM2, 1.0, accuracy: 0.01)
+    }
+    
+    func testPolygonRoomLShapedArea() {
+        // Test L-shaped polygon (6m x 4m minus 2m x 2m cut-out)
+        let lShapePoints = [
+            RoomPoint(x: 0, y: 0),
+            RoomPoint(x: 6000, y: 0),
+            RoomPoint(x: 6000, y: 4000),
+            RoomPoint(x: 2000, y: 4000),
+            RoomPoint(x: 2000, y: 2000),
+            RoomPoint(x: 0, y: 2000)
+        ]
+        
+        let lShapeRoom = RoomSettings(
+            lengthMm: 6000,
+            widthMm: 4000,
+            expansionGapMm: 10,
+            shape: .polygon,
+            polygonPoints: lShapePoints
+        )
+        
+        // Expected area: (6m × 4m) - (4m × 2m) = 24 - 8 = 16 m²
+        XCTAssertEqual(lShapeRoom.grossAreaM2, 16.0, accuracy: 0.1)
+    }
+    
+    func testPolygonRoomPointInside() {
+        // Test square polygon
+        let squarePoints = [
+            RoomPoint(x: 0, y: 0),
+            RoomPoint(x: 1000, y: 0),
+            RoomPoint(x: 1000, y: 1000),
+            RoomPoint(x: 0, y: 1000)
+        ]
+        
+        let squareRoom = RoomSettings(
+            lengthMm: 1000,
+            widthMm: 1000,
+            expansionGapMm: 10,
+            shape: .polygon,
+            polygonPoints: squarePoints
+        )
+        
+        // Point inside
+        XCTAssertTrue(squareRoom.contains(x: 500, y: 500))
+        
+        // Point outside
+        XCTAssertFalse(squareRoom.contains(x: 1500, y: 500))
+        XCTAssertFalse(squareRoom.contains(x: 500, y: 1500))
+        
+        // Point on edge (may or may not be inside depending on implementation)
+        let onEdge = squareRoom.contains(x: 0, y: 500)
+        // Just verify it doesn't crash
+        _ = onEdge
+    }
+    
+    func testPolygonRoomBoundingBox() {
+        let irregularPoints = [
+            RoomPoint(x: 100, y: 200),
+            RoomPoint(x: 500, y: 100),
+            RoomPoint(x: 800, y: 400),
+            RoomPoint(x: 300, y: 600)
+        ]
+        
+        let irregularRoom = RoomSettings(
+            lengthMm: 800,
+            widthMm: 600,
+            expansionGapMm: 10,
+            shape: .polygon,
+            polygonPoints: irregularPoints
+        )
+        
+        // Bounding box should be 700 x 500
+        XCTAssertEqual(irregularRoom.boundingLengthMm, 700, accuracy: 0.1)
+        XCTAssertEqual(irregularRoom.boundingWidthMm, 500, accuracy: 0.1)
+    }
+    
+    func testRectangularRoomBackwardCompatibility() {
+        // Ensure rectangular rooms still work as before
+        let rectRoom = RoomSettings(lengthMm: 5000, widthMm: 4000, expansionGapMm: 10)
+        
+        XCTAssertEqual(rectRoom.shape, .rectangular)
+        XCTAssertEqual(rectRoom.grossAreaM2, 20.0, accuracy: 0.01)
+        XCTAssertEqual(rectRoom.usableAreaM2, 19.8204, accuracy: 0.01)
+        XCTAssertTrue(rectRoom.contains(x: 2500, y: 2000))
+        XCTAssertFalse(rectRoom.contains(x: 6000, y: 2000))
+    }

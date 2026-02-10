@@ -4,6 +4,22 @@ A universal SwiftUI app for planning and calculating floor installations with su
 
 ## Features
 
+### Room Configuration
+
+**Rectangular Mode (Traditional)**
+- Simple length and width input
+- Perfect for standard rectangular rooms
+- Quick and easy setup
+
+**Parametric Designer (NEW!)**
+- CAD-style line drawing tool
+- Create complex room shapes (L-shaped, U-shaped, irregular)
+- Click to place points and draw walls
+- Automatic dimension calculation
+- Snap-to-grid for precise measurements
+- Visual grid canvas with zoom and pan
+- See [PARAMETRIC_ROOM_GUIDE.md](PARAMETRIC_ROOM_GUIDE.md) for details
+
 ### Material Types
 
 **Laminate Planks**
@@ -30,6 +46,7 @@ A universal SwiftUI app for planning and calculating floor installations with su
    - Handles insufficient stock by marking "NEEDED" pieces
    - Continues planning even when stock runs out
    - Shows exactly what additional materials are required
+   - Works with both rectangular and custom polygon rooms
 
 3. **Comprehensive Reports**
    - Area summary (room, usable, installed, needed, waste)
@@ -42,6 +59,7 @@ A universal SwiftUI app for planning and calculating floor installations with su
    - 2D plan view with zoom and pan
    - Color-coded pieces (installed vs needed)
    - Room outline and usable area boundaries
+   - Support for polygon room shapes
    - Interactive legend
 
 5. **Export Capabilities**
