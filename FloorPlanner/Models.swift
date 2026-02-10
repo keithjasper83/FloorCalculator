@@ -71,11 +71,11 @@ struct RoomSettings: Codable, Equatable {
     }
     
     var usableLengthMm: Double {
-        boundingLengthMm - 2 * expansionGapMm
+        max(0, boundingLengthMm - 2 * expansionGapMm)
     }
     
     var usableWidthMm: Double {
-        boundingWidthMm - 2 * expansionGapMm
+        max(0, boundingWidthMm - 2 * expansionGapMm)
     }
     
     var grossAreaM2: Double {

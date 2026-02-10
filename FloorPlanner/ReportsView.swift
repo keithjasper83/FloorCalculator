@@ -33,7 +33,13 @@ struct ReportsView: View {
                             
                             Divider()
                             
-                            let completionPercent = (result.installedAreaM2 / appState.currentProject.roomSettings.usableAreaM2) * 100
+                            let usableArea = appState.currentProject.roomSettings.usableAreaM2
+                            let completionPercent: Double
+                            if usableArea > 0 {
+                                completionPercent = (result.installedAreaM2 / usableArea) * 100
+                            } else {
+                                completionPercent = 0
+                            }
                             reportRow("Completion", value: "\(completionPercent, specifier: "%.1f")%", 
                                      color: completionPercent >= 99.9 ? .green : .orange)
                         }

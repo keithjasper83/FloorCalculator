@@ -238,10 +238,9 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertFalse(squareRoom.contains(x: 1500, y: 500))
         XCTAssertFalse(squareRoom.contains(x: 500, y: 1500))
         
-        // Point on edge (may or may not be inside depending on implementation)
-        let onEdge = squareRoom.contains(x: 0, y: 500)
-        // Just verify it doesn't crash
-        _ = onEdge
+        // Point on edge (boundary points treated as inside per ray casting convention)
+        XCTAssertTrue(squareRoom.contains(x: 0, y: 500), "Boundary points should be considered inside")
+        XCTAssertTrue(squareRoom.contains(x: 1000, y: 500), "Boundary points should be considered inside")
     }
     
     func testPolygonRoomBoundingBox() {

@@ -267,8 +267,8 @@ struct RoomDesignerView: View {
                     y: centerY + end.y * mmToPixels
                 )
                 
-                // Only draw line if not closing back (except when polygon is complete)
-                if i < points.count - 1 || points.count > 3 {
+                // Draw line segment (skip closing segment unless polygon is explicitly closed)
+                if i < points.count - 1 {
                     context.stroke(
                         Path { path in
                             path.move(to: startPoint)
@@ -395,17 +395,27 @@ struct RoomDesignerView: View {
     private func applyDesign() {
         // Convert points to room settings
         appState.currentProject.roomSettings.shape = .polygon
-        appState.currentProject.roomSettings.polygonPoints = points
         
-        // Update bounding box dimensions for backward compatibility
-        if !points.isEmpty {
-            let maxX = points.map { $0.x }.max() ?? 0
+        if points.isEmpty {
+            // No points: save an empty polygon and leave existing dimensions unchanged
+            appState.currentProject.roomSettings.polygonPoints = []
+        } else {
+            // Normalize polygon so its minimum coordinate is at (0, 0)
             let minX = points.map { $0.x }.min() ?? 0
-            let maxY = points.map { $0.y }.max() ?? 0
             let minY = points.map { $0.y }.min() ?? 0
             
-            appState.currentProject.roomSettings.lengthMm = maxX - minX
-            appState.currentProject.roomSettings.widthMm = maxY - minY
+            let translatedPoints = points.map { point in
+                RoomPoint(x: point.x - minX, y: point.y - minY)
+            }
+            
+            appState.currentProject.roomSettings.polygonPoints = translatedPoints
+            
+            // Update bounding box dimensions for backward compatibility
+            let maxX = translatedPoints.map { $0.x }.max() ?? 0
+            let maxY = translatedPoints.map { $0.y }.max() ?? 0
+            
+            appState.currentProject.roomSettings.lengthMm = maxX
+            appState.currentProject.roomSettings.widthMm = maxY
         }
         
         appState.saveProject()

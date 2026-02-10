@@ -64,11 +64,16 @@ class TileEngine: LayoutEngine {
                 
                 // Apply brick offset pattern if selected
                 var offsetX = x
+                var actualLength = tileSize
                 if settings.pattern == .brick && row % 2 == 1 {
                     offsetX += tileSize / 2
-                    // Check if offset pushes us out of bounds
-                    if offsetX + actualLength > usableLength {
-                        continue // Skip this tile in brick pattern
+                    // If offset pushes us out of bounds, place a partial tile at the edge
+                    if offsetX + tileSize > usableLength {
+                        actualLength = max(0, usableLength - offsetX)
+                        if actualLength < 50 {
+                            // Too small, skip this tile
+                            continue
+                        }
                     }
                 }
                 
@@ -127,11 +132,13 @@ class TileEngine: LayoutEngine {
         var remainingPieces: [RemainingPiece] = []
         let unusedTiles = availableFullTiles - tilesUsed
         if unusedTiles > 0 {
-            remainingPieces.append(RemainingPiece(
-                lengthMm: tileSize,
-                widthMm: tileSize,
-                source: .stock
-            ))
+            for _ in 0..<unusedTiles {
+                remainingPieces.append(RemainingPiece(
+                    lengthMm: tileSize,
+                    widthMm: tileSize,
+                    source: .stock
+                ))
+            }
         }
         
         // If reuse edge offcuts is enabled, calculate saved offcuts

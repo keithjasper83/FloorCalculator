@@ -11,7 +11,10 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     
     var body: some View {
-        #if os(iOS)
+        #if targetEnvironment(macCatalyst)
+        // Mac Catalyst: Split view
+        macView
+        #elseif os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad {
             // iPad: Split view
             iPadView
@@ -20,7 +23,7 @@ struct ContentView: View {
             iPhoneView
         }
         #else
-        // Mac: Split view
+        // macOS: Split view
         macView
         #endif
     }

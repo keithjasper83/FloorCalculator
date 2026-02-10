@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "999999"
+               BlueprintIdentifier = "A1FFFFFF"
                BuildableName = "FloorPlanner.app"
                BlueprintName = "FloorPlanner"
                ReferencedContainer = "container:FloorPlanner.xcodeproj">
@@ -32,7 +32,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "999998"
+               BlueprintIdentifier = "A2FFFFFF"
                BuildableName = "FloorPlannerTests.xctest"
                BlueprintName = "FloorPlannerTests"
                ReferencedContainer = "container:FloorPlanner.xcodeproj">
@@ -54,7 +54,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "999999"
+            BlueprintIdentifier = "A1FFFFFF"
             BuildableName = "FloorPlanner.app"
             BlueprintName = "FloorPlanner"
             ReferencedContainer = "container:FloorPlanner.xcodeproj">
@@ -71,7 +71,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "999999"
+            BlueprintIdentifier = "A1FFFFFF"
             BuildableName = "FloorPlanner.app"
             BlueprintName = "FloorPlanner"
             ReferencedContainer = "container:FloorPlanner.xcodeproj">

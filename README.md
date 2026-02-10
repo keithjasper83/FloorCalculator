@@ -64,7 +64,7 @@ A universal SwiftUI app for planning and calculating floor installations with su
 
 5. **Export Capabilities**
    - Save/load projects as JSON
-   - Export layout as PNG image
+   - Export layout as PNG image (planned)
    - Export data as CSV files:
      - Placements list
      - Cut list

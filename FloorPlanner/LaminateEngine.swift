@@ -78,7 +78,7 @@ class LaminateEngine: LayoutEngine {
             lastRowStartOffset = rowStartOffset
             
             // Place planks in this row
-            var currentX = rowStartOffset
+            var currentX = 0.0
             var needsStartCut = rowStartOffset > 0.0
             
             while currentX < rowLength {

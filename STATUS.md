@@ -235,12 +235,11 @@ See [USER_GUIDE.md](./USER_GUIDE.md) for:
 - [ ] ShareSheet/NSSavePanel UI (export ready)
 - [ ] Project browser
 - [ ] Undo/redo
-- [ ] Multiple/complex room shapes
 - [ ] Cost tracking
 - [ ] Material library
+- [ ] Layout engines fully integrate polygon boundaries (Phase 4)
 
 ### Not Implemented (Out of Scope)
-- Parametric room modeling (mentioned in spec but complex)
 - Cloud sync
 - Multi-user collaboration
 - 3D visualization

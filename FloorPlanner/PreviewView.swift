@@ -90,6 +90,15 @@ struct PreviewView: View {
         let availableWidth = size.width - 2 * marginPx
         let availableHeight = size.height - 2 * marginPx
         
+        // Guard against zero/invalid bounds to avoid NaN/inf in scale calculations
+        guard availableWidth > 0,
+              availableHeight > 0,
+              room.boundingLengthMm > 0,
+              room.boundingWidthMm > 0 else {
+            // Invalid geometry or canvas; render empty state
+            return
+        }
+        
         let scaleX = availableWidth / room.boundingLengthMm
         let scaleY = availableHeight / room.boundingWidthMm
         let baseScale = min(scaleX, scaleY) * scale
