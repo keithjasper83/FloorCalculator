@@ -24,7 +24,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		A3000001 /* PBXContainerItemProxy */ = {
+		B3000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A0000001 /* Project object */;
 			proxyType = 1;
@@ -77,11 +77,11 @@
 			children = (
 				A2000000 /* FloorPlanner */,
 				A3000001 /* Tests */,
-				A0000001 /* Products */,
+				B0000001 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A0000001 /* Products */ = {
+		B0000001 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A1000000 /* FloorPlanner.app */,
@@ -157,7 +157,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				A3000002 /* PBXTargetDependency */,
+				B3000002 /* PBXTargetDependency */,
 			);
 			name = FloorPlannerTests;
 			productName = FloorPlannerTests;
@@ -192,7 +192,7 @@
 				Base,
 			);
 			mainGroup = A0000000;
-			productRefGroup = A0000001 /* Products */;
+			productRefGroup = B0000001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -234,10 +234,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A3000002 /* PBXTargetDependency */ = {
+		B3000002 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A1FFFFFF /* FloorPlanner */;
-			targetProxy = A3000001 /* PBXContainerItemProxy */;
+			targetProxy = B3000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
