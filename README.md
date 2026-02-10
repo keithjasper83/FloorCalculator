@@ -240,3 +240,28 @@ Tests cover:
 ## Contributing
 
 [Add contribution guidelines here]
+
+## New Features (Spectacular V1)
+
+### iCloud Sync
+Projects are now automatically synced across all your devices using iCloud (Core Data + CloudKit).
+- **Requirements**: Signed in to iCloud on all devices. iCloud Drive enabled.
+- **Setup**:
+  1. Add "iCloud" capability in Xcode.
+  2. Check "CloudKit" and use container `iCloud.com.keithjasper83.FloorPlanner`.
+  3. Ensure "Background Modes" -> "Remote notifications" is enabled.
+
+### Diagonal Installation
+Support for diagonal layouts for both laminate and carpet tiles.
+- **Usage**: In Room Settings, select "Diagonal" pattern and adjust the angle (0-60°).
+- **Algorithm**: The room is rotated internally, laid out, and then pieces are transformed back.
+
+### AR Room Capture (iOS/iPadOS)
+Scan your room using LiDAR-enabled devices.
+- **Requirements**: iPhone 12 Pro or later, or iPad Pro (2020 or later) with LiDAR scanner. iOS 16+.
+- **Usage**: Tap "Scan Room with AR" in Room Settings.
+- **Fallback**: Manual entry is available for unsupported devices.
+
+### Known Limitations
+- Diagonal cut precision is approximate for complex polygons near boundaries.
+- AR Scan produces a rectangular approximation of the scanned room in this version.

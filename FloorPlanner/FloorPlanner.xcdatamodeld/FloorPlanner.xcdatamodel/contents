@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="21501" systemVersion="22E261" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="ProjectEntity" representedClassName="ProjectEntity" syncable="YES" >
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="currency" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="materialType" optional="YES" attributeType="String"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="wasteFactor" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <relationship name="laminateSettings" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="LaminateSettingsEntity" inverseName="project" inverseEntity="LaminateSettingsEntity"/>
+        <relationship name="roomSettings" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="RoomSettingsEntity" inverseName="project" inverseEntity="RoomSettingsEntity"/>
+        <relationship name="stockItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StockItemEntity" inverseName="project" inverseEntity="StockItemEntity"/>
+        <relationship name="tileSettings" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="TileSettingsEntity" inverseName="project" inverseEntity="TileSettingsEntity"/>
+    </entity>
+    <entity name="StockItemEntity" representedClassName="StockItemEntity" syncable="YES" >
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lengthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="pricePerUnit" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="quantity" optional="YES" attributeType="Integer 64" usesScalarValueType="YES"/>
+        <attribute name="widthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <relationship name="project" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProjectEntity" inverseName="stockItems" inverseEntity="ProjectEntity"/>
+    </entity>
+    <entity name="RoomSettingsEntity" representedClassName="RoomSettingsEntity" syncable="YES" >
+        <attribute name="expansionGapMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="lengthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="shape" optional="YES" attributeType="String"/>
+        <attribute name="widthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="patternType" optional="YES" attributeType="String"/>
+        <attribute name="angleDegrees" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <relationship name="polygonPoints" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RoomPointEntity" inverseName="roomSettings" inverseEntity="RoomPointEntity"/>
+        <relationship name="project" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProjectEntity" inverseName="roomSettings" inverseEntity="ProjectEntity"/>
+    </entity>
+    <entity name="RoomPointEntity" representedClassName="RoomPointEntity" syncable="YES" >
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="orderIndex" optional="YES" attributeType="Integer 64" usesScalarValueType="YES"/>
+        <attribute name="x" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="y" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <relationship name="roomSettings" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoomSettingsEntity" inverseName="polygonPoints" inverseEntity="RoomSettingsEntity"/>
+    </entity>
+    <entity name="LaminateSettingsEntity" representedClassName="LaminateSettingsEntity" syncable="YES" >
+        <attribute name="defaultPlankLengthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="defaultPlankWidthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="defaultPricePerPlank" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="minOffcutLengthMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="minStaggerMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="plankDirection" optional="YES" attributeType="String"/>
+        <relationship name="project" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProjectEntity" inverseName="laminateSettings" inverseEntity="ProjectEntity"/>
+    </entity>
+    <entity name="TileSettingsEntity" representedClassName="TileSettingsEntity" syncable="YES" >
+        <attribute name="defaultPricePerTile" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="orientation" optional="YES" attributeType="String"/>
+        <attribute name="pattern" optional="YES" attributeType="String"/>
+        <attribute name="reuseEdgeOffcuts" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="tileSizeMm" optional="YES" attributeType="Double" usesScalarValueType="YES"/>
+        <attribute name="tilesPerBox" optional="YES" attributeType="Integer 64" usesScalarValueType="YES"/>
+        <relationship name="project" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProjectEntity" inverseName="tileSettings" inverseEntity="ProjectEntity"/>
+    </entity>
+</model>

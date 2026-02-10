@@ -10,6 +10,7 @@ import SwiftUI
 struct RoomSettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showDesigner = false
+    @State private var showARScanner = false
     
     var body: some View {
         Form {
@@ -45,6 +46,12 @@ struct RoomSettingsView: View {
             
             if appState.currentProject.roomSettings.shape == .rectangular {
                 Section("Room Dimensions") {
+                    #if os(iOS)
+                    Button(action: { showARScanner = true }) {
+                        Label("Scan Room with AR", systemImage: "camera.viewfinder")
+                    }
+                    #endif
+
                     HStack {
                         Text("Length (mm)")
                         Spacer()
@@ -76,6 +83,37 @@ struct RoomSettingsView: View {
                 }
             }
             
+            Section("Installation Pattern") {
+                Picker("Pattern", selection: $appState.currentProject.roomSettings.patternType) {
+                    ForEach(InstallationPattern.allCases, id: \.self) { pattern in
+                        Text(pattern.rawValue).tag(pattern)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if appState.currentProject.roomSettings.patternType == .diagonal {
+                    VStack {
+                        HStack {
+                            Text("Angle")
+                            Spacer()
+                            Text("\(Int(appState.currentProject.roomSettings.angleDegrees))°")
+                        }
+                        Slider(value: $appState.currentProject.roomSettings.angleDegrees, in: 0...60, step: 1)
+
+                        // Presets
+                        HStack {
+                            Button("0°") { appState.currentProject.roomSettings.angleDegrees = 0 }
+                            Spacer()
+                            Button("22.5°") { appState.currentProject.roomSettings.angleDegrees = 22.5 }
+                            Spacer()
+                            Button("45°") { appState.currentProject.roomSettings.angleDegrees = 45 }
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption)
+                    }
+                }
+            }
+
             Section("Calculated Areas") {
                 HStack {
                     Text("Gross Area")
@@ -114,6 +152,9 @@ struct RoomSettingsView: View {
         }
         .sheet(isPresented: $showDesigner) {
             RoomDesignerView()
+        }
+        .sheet(isPresented: $showARScanner) {
+            ARCaptureView(roomSettings: $appState.currentProject.roomSettings)
         }
     }
 }

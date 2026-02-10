@@ -24,7 +24,11 @@ let package = Package(
                 "LayoutEngine.swift",
                 "LaminateEngine.swift",
                 "TileEngine.swift",
-                "PersistenceManager.swift"
+                "PersistenceManager.swift",
+                "CoreDataStack.swift"
+            ],
+            resources: [
+                .process("FloorPlanner.xcdatamodeld")
             ]
         ),
         .testTarget(
