@@ -21,6 +21,7 @@
 		A1000012 /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012 /* PreviewView.swift */; };
 		A1000013 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013 /* ReportsView.swift */; };
 		A1000020 /* FloorPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000020 /* FloorPlannerTests.swift */; };
+		A1000021 /* ViewExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000021 /* ViewExtensions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,7 @@
 		A2000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000015 /* FloorPlanner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FloorPlanner.entitlements; sourceTree = "<group>"; };
 		A2000020 /* FloorPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorPlannerTests.swift; sourceTree = "<group>"; };
+		A2000021 /* ViewExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewExtensions.swift; sourceTree = "<group>"; };
 		A3000000 /* FloorPlannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FloorPlannerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -108,6 +110,7 @@
 				A2000011 /* MaterialSettingsView.swift */,
 				A2000012 /* PreviewView.swift */,
 				A2000013 /* ReportsView.swift */,
+				A2000021 /* ViewExtensions.swift */,
 			);
 			path = FloorPlanner;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				A1000011 /* MaterialSettingsView.swift in Sources */,
 				A1000012 /* PreviewView.swift in Sources */,
 				A1000013 /* ReportsView.swift in Sources */,
+				A1000021 /* ViewExtensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

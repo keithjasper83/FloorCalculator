@@ -63,7 +63,6 @@ struct MaterialPickerView: View {
                 }
                 .padding()
             }
-            .navigationBarTitleDisplayMode(.inline)
             .alert("Change Material Type?", isPresented: $showWarning) {
                 Button("Cancel", role: .cancel) {}
                 Button("Change", role: .destructive) {
@@ -73,6 +72,9 @@ struct MaterialPickerView: View {
             } message: {
                 Text("This will regenerate the layout with different rules. Your current layout will be replaced.")
             }
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         .onAppear {
             selectedType = appState.currentProject.materialType

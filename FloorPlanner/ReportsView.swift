@@ -5,6 +5,7 @@
 //  View for displaying layout reports and statistics
 //
 
+import Foundation
 import SwiftUI
 
 struct ReportsView: View {
@@ -17,18 +18,18 @@ struct ReportsView: View {
                     // Area Summary
                     GroupBox("Area Summary") {
                         VStack(alignment: .leading, spacing: 8) {
-                            reportRow("Room Area", value: "\(appState.currentProject.roomSettings.grossAreaM2, specifier: "%.2f") m²")
-                            reportRow("Usable Area", value: "\(appState.currentProject.roomSettings.usableAreaM2, specifier: "%.2f") m²")
-                            reportRow("Installed Coverage", value: "\(result.installedAreaM2, specifier: "%.2f") m²")
+                            reportRow("Room Area", value: "\(appState.currentProject.roomSettings.grossAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
+                            reportRow("Usable Area", value: "\(appState.currentProject.roomSettings.usableAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
+                            reportRow("Installed Coverage", value: "\(result.installedAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
                             if result.neededAreaM2 > 0.01 {
-                                reportRow("Needed Coverage", value: "\(result.neededAreaM2, specifier: "%.2f") m²", color: .red)
+                                reportRow("Needed Coverage", value: "\(result.neededAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .red)
                             }
                             
-                            reportRow("Waste Area", value: "\(result.wasteAreaM2, specifier: "%.2f") m²")
+                            reportRow("Waste Area", value: "\(result.wasteAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
                             if result.surplusAreaM2 > 0.01 {
-                                reportRow("Surplus", value: "\(result.surplusAreaM2, specifier: "%.2f") m²", color: .green)
+                                reportRow("Surplus", value: "\(result.surplusAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .green)
                             }
                             
                             Divider()
@@ -40,7 +41,7 @@ struct ReportsView: View {
                             } else {
                                 completionPercent = 0
                             }
-                            reportRow("Completion", value: "\(completionPercent, specifier: "%.1f")%", 
+                            reportRow("Completion", value: "\(completionPercent.formatted(.number.precision(.fractionLength(1))))%",
                                      color: completionPercent >= 99.9 ? .green : .orange)
                         }
                     }
