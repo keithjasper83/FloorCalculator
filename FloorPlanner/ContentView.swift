@@ -30,6 +30,7 @@ struct ContentView: View {
     
     // MARK: - iPhone View
     
+    #if os(iOS)
     private var iPhoneView: some View {
         NavigationStack {
             List {
@@ -131,6 +132,7 @@ struct ContentView: View {
             MaterialPickerView()
         }
     }
+    #endif
     
     // MARK: - Mac View
     

@@ -34,6 +34,20 @@ class LaminateEngine: LayoutEngine {
         return generateLayoutInternal(project: project, useStock: useStock)
     }
 
+    private func emptyResult() -> LayoutResult {
+        return LayoutResult(
+            placedPieces: [],
+            cutRecords: [],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+    }
+
     private func generateLayoutInternal(project: Project, useStock: Bool) -> LayoutResult {
         guard let settings = project.laminateSettings else {
             return emptyResult()

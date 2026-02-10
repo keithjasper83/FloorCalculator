@@ -270,7 +270,7 @@ struct PreviewView: View {
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.primary.colorInvert().opacity(0.9))
+                .fill(.regularMaterial)
         )
     }
     

@@ -71,7 +71,9 @@ struct RoomDesignerView: View {
                 instructionsView
             }
             .navigationTitle("Room Designer")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -167,7 +169,9 @@ struct RoomDesignerView: View {
                 }
             }
             .navigationTitle("Edit Dimension")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

@@ -17,18 +17,18 @@ struct ReportsView: View {
                     // Area Summary
                     GroupBox("Area Summary") {
                         VStack(alignment: .leading, spacing: 8) {
-                            reportRow("Room Area", value: "\(appState.currentProject.roomSettings.grossAreaM2, specifier: "%.2f") m²")
-                            reportRow("Usable Area", value: "\(appState.currentProject.roomSettings.usableAreaM2, specifier: "%.2f") m²")
-                            reportRow("Installed Coverage", value: "\(result.installedAreaM2, specifier: "%.2f") m²")
+                            reportRow("Room Area", value: "\(String(format: "%.2f", appState.currentProject.roomSettings.grossAreaM2)) m²")
+                            reportRow("Usable Area", value: "\(String(format: "%.2f", appState.currentProject.roomSettings.usableAreaM2)) m²")
+                            reportRow("Installed Coverage", value: "\(String(format: "%.2f", result.installedAreaM2)) m²")
                             
                             if result.neededAreaM2 > 0.01 {
-                                reportRow("Needed Coverage", value: "\(result.neededAreaM2, specifier: "%.2f") m²", color: .red)
+                                reportRow("Needed Coverage", value: "\(String(format: "%.2f", result.neededAreaM2)) m²", color: .red)
                             }
                             
-                            reportRow("Waste Area", value: "\(result.wasteAreaM2, specifier: "%.2f") m²")
+                            reportRow("Waste Area", value: "\(String(format: "%.2f", result.wasteAreaM2)) m²")
                             
                             if result.surplusAreaM2 > 0.01 {
-                                reportRow("Surplus", value: "\(result.surplusAreaM2, specifier: "%.2f") m²", color: .green)
+                                reportRow("Surplus", value: "\(String(format: "%.2f", result.surplusAreaM2)) m²", color: .green)
                             }
                             
                             Divider()
@@ -40,7 +40,7 @@ struct ReportsView: View {
                             } else {
                                 completionPercent = 0
                             }
-                            reportRow("Completion", value: "\(completionPercent, specifier: "%.1f")%", 
+                            reportRow("Completion", value: "\(String(format: "%.1f", completionPercent))%",
                                      color: completionPercent >= 99.9 ? .green : .orange)
                         }
                     }

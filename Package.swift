@@ -24,8 +24,7 @@ let package = Package(
                 "LayoutEngine.swift",
                 "LaminateEngine.swift",
                 "TileEngine.swift",
-                "PersistenceManager.swift",
-                "CoreDataStack.swift"
+                "PersistenceManager.swift"
             ],
             resources: [
                 .process("FloorPlanner.xcdatamodeld")

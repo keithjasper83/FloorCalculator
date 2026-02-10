@@ -153,8 +153,10 @@ struct RoomSettingsView: View {
         .sheet(isPresented: $showDesigner) {
             RoomDesignerView()
         }
+        #if os(iOS)
         .sheet(isPresented: $showARScanner) {
             ARCaptureView(roomSettings: $appState.currentProject.roomSettings)
         }
+        #endif
     }
 }
