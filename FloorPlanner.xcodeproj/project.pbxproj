@@ -1,0 +1,393 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		100001 /* FloorPlannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200001 /* FloorPlannerApp.swift */; };
+		100002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200002 /* ContentView.swift */; };
+		100003 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200003 /* Models.swift */; };
+		100004 /* LayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200004 /* LayoutEngine.swift */; };
+		100005 /* LaminateEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200005 /* LaminateEngine.swift */; };
+		100006 /* TileEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200006 /* TileEngine.swift */; };
+		100007 /* PersistenceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200007 /* PersistenceManager.swift */; };
+		100008 /* MaterialPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200008 /* MaterialPickerView.swift */; };
+		100009 /* RoomSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200009 /* RoomSettingsView.swift */; };
+		100010 /* StockTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200010 /* StockTableView.swift */; };
+		100011 /* MaterialSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200011 /* MaterialSettingsView.swift */; };
+		100012 /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200012 /* PreviewView.swift */; };
+		100013 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200013 /* ReportsView.swift */; };
+		100020 /* FloorPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200020 /* FloorPlannerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		100000 /* FloorPlanner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FloorPlanner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		200001 /* FloorPlannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorPlannerApp.swift; sourceTree = "<group>"; };
+		200002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		200003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		200004 /* LayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutEngine.swift; sourceTree = "<group>"; };
+		200005 /* LaminateEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaminateEngine.swift; sourceTree = "<group>"; };
+		200006 /* TileEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileEngine.swift; sourceTree = "<group>"; };
+		200007 /* PersistenceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceManager.swift; sourceTree = "<group>"; };
+		200008 /* MaterialPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialPickerView.swift; sourceTree = "<group>"; };
+		200009 /* RoomSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSettingsView.swift; sourceTree = "<group>"; };
+		200010 /* StockTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockTableView.swift; sourceTree = "<group>"; };
+		200011 /* MaterialSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaterialSettingsView.swift; sourceTree = "<group>"; };
+		200012 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
+		200013 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		200014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		200015 /* FloorPlanner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FloorPlanner.entitlements; sourceTree = "<group>"; };
+		200020 /* FloorPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloorPlannerTests.swift; sourceTree = "<group>"; };
+		300000 /* FloorPlannerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FloorPlannerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		000000 = {
+			isa = PBXGroup;
+			children = (
+				200000 /* FloorPlanner */,
+				300001 /* Tests */,
+				000001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				100000 /* FloorPlanner.app */,
+				300000 /* FloorPlannerTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		200000 /* FloorPlanner */ = {
+			isa = PBXGroup;
+			children = (
+				200001 /* FloorPlannerApp.swift */,
+				200002 /* ContentView.swift */,
+				200003 /* Models.swift */,
+				200004 /* LayoutEngine.swift */,
+				200005 /* LaminateEngine.swift */,
+				200006 /* TileEngine.swift */,
+				200007 /* PersistenceManager.swift */,
+				200008 /* MaterialPickerView.swift */,
+				200009 /* RoomSettingsView.swift */,
+				200010 /* StockTableView.swift */,
+				200011 /* MaterialSettingsView.swift */,
+				200012 /* PreviewView.swift */,
+				200013 /* ReportsView.swift */,
+				200014 /* Info.plist */,
+				200015 /* FloorPlanner.entitlements */,
+			);
+			path = FloorPlanner;
+			sourceTree = "<group>";
+		};
+		300001 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				300002 /* FloorPlannerTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		300002 /* FloorPlannerTests */ = {
+			isa = PBXGroup;
+			children = (
+				200020 /* FloorPlannerTests.swift */,
+			);
+			path = FloorPlannerTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		999999 /* FloorPlanner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 888888 /* Build configuration list for PBXNativeTarget "FloorPlanner" */;
+			buildPhases = (
+				777777 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FloorPlanner;
+			productName = FloorPlanner;
+			productReference = 100000 /* FloorPlanner.app */;
+			productType = "com.apple.product-type.application";
+		};
+		999998 /* FloorPlannerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 888887 /* Build configuration list for PBXNativeTarget "FloorPlannerTests" */;
+			buildPhases = (
+				777776 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FloorPlannerTests;
+			productName = FloorPlannerTests;
+			productReference = 300000 /* FloorPlannerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = 888889 /* Build configuration list for PBXProject "FloorPlanner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000;
+			productRefGroup = 000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				999999 /* FloorPlanner */,
+				999998 /* FloorPlannerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		777777 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100001 /* FloorPlannerApp.swift in Sources */,
+				100002 /* ContentView.swift in Sources */,
+				100003 /* Models.swift in Sources */,
+				100004 /* LayoutEngine.swift in Sources */,
+				100005 /* LaminateEngine.swift in Sources */,
+				100006 /* TileEngine.swift in Sources */,
+				100007 /* PersistenceManager.swift in Sources */,
+				100008 /* MaterialPickerView.swift in Sources */,
+				100009 /* RoomSettingsView.swift in Sources */,
+				100010 /* StockTableView.swift in Sources */,
+				100011 /* MaterialSettingsView.swift in Sources */,
+				100012 /* PreviewView.swift in Sources */,
+				100013 /* ReportsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		777776 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100020 /* FloorPlannerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		666666 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = FloorPlanner/FloorPlanner.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FloorPlanner/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.FloorPlanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		666665 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = FloorPlanner/FloorPlanner.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FloorPlanner/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.FloorPlanner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		888888 /* Build configuration list for PBXNativeTarget "FloorPlanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				666666 /* Debug */,
+				666665 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		888887 /* Build configuration list for PBXNativeTarget "FloorPlannerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				666666 /* Debug */,
+				666665 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		888889 /* Build configuration list for PBXProject "FloorPlanner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				666666 /* Debug */,
+				666665 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000002 /* Project object */;
+}
