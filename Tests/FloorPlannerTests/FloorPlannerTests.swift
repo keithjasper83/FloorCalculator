@@ -158,7 +158,8 @@ final class FloorPlannerTests: XCTestCase {
             installedAreaM2: 0.2,
             neededAreaM2: 0,
             wasteAreaM2: 0,
-            surplusAreaM2: 0
+            surplusAreaM2: 0,
+            totalCost: 0
         )
         
         let csv = PersistenceManager.shared.exportPlacementCSV(result: result)
