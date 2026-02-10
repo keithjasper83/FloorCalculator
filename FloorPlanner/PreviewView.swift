@@ -180,8 +180,21 @@ struct PreviewView: View {
             let width = piece.lengthMm * baseScale
             let height = piece.widthMm * baseScale
             
-            let rect = CGRect(x: x, y: y, width: width, height: height)
-            let path = Path(rect)
+            // Handle rotation
+            let centerX = x + width / 2
+            let centerY = y + height / 2
+
+            // Create path centered at 0,0
+            let centeredRect = CGRect(x: -width/2, y: -height/2, width: width, height: height)
+            var transformedPath = Path(centeredRect)
+
+            // Apply rotation and translation
+            let rotationTransform = CGAffineTransform(rotationAngle: piece.rotation * .pi / 180.0)
+            let translationTransform = CGAffineTransform(translationX: centerX, y: centerY)
+
+            let combinedTransform = rotationTransform.concatenating(translationTransform)
+
+            let path = transformedPath.applying(combinedTransform)
             
             // Color based on status
             let fillColor: Color
@@ -204,12 +217,13 @@ struct PreviewView: View {
             
             // Draw label if piece is large enough
             if width > 30 && height > 15 {
-                let labelPoint = CGPoint(x: x + width / 2, y: y + height / 2)
+                let centerX = x + width / 2
+                let centerY = y + height / 2
                 context.draw(
                     Text(piece.label)
                         .font(.system(size: 8))
                         .foregroundColor(.primary),
-                    at: labelPoint
+                    at: CGPoint(x: centerX, y: centerY)
                 )
             }
         }

@@ -10,6 +10,31 @@ import Foundation
 class LaminateEngine: LayoutEngine {
     
     func generateLayout(project: Project, useStock: Bool) -> LayoutResult {
+        // Check for diagonal pattern
+        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > 0.1 {
+            let transform = LayoutTransform(room: project.roomSettings, angleDegrees: project.roomSettings.angleDegrees)
+            let rotatedRoom = transform.rotatedRoom(from: project.roomSettings)
+
+            var rotatedProject = project
+            rotatedProject.roomSettings = rotatedRoom
+            // Ensure pattern type is straight for the internal engine
+            rotatedProject.roomSettings.patternType = .straight
+            rotatedProject.roomSettings.angleDegrees = 0
+
+            let result = generateLayoutInternal(project: rotatedProject, useStock: useStock)
+
+            // Transform pieces back
+            let transformedPieces = result.placedPieces.map { transform.transformBack($0) }
+
+            var finalResult = result
+            finalResult.placedPieces = transformedPieces
+            return finalResult
+        }
+
+        return generateLayoutInternal(project: project, useStock: useStock)
+    }
+
+    private func generateLayoutInternal(project: Project, useStock: Bool) -> LayoutResult {
         guard let settings = project.laminateSettings else {
             return emptyResult()
         }

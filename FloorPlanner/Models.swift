@@ -21,6 +21,13 @@ enum RoomShape: String, Codable, CaseIterable {
     case polygon = "Custom Polygon"
 }
 
+// MARK: - Installation Pattern
+
+enum InstallationPattern: String, Codable, CaseIterable {
+    case straight = "Straight"
+    case diagonal = "Diagonal"
+}
+
 // MARK: - Room Point
 
 struct RoomPoint: Codable, Equatable, Identifiable {
@@ -44,6 +51,10 @@ struct RoomSettings: Codable, Equatable {
     var widthMm: Double
     var expansionGapMm: Double
     
+    // Pattern mode properties
+    var patternType: InstallationPattern = .straight
+    var angleDegrees: Double = 0.0
+
     // Polygon mode properties
     var polygonPoints: [RoomPoint]
     
@@ -96,12 +107,14 @@ struct RoomSettings: Codable, Equatable {
     }
     
     // Initialize with rectangular shape (default)
-    init(lengthMm: Double = 5000, widthMm: Double = 4000, expansionGapMm: Double = 10, shape: RoomShape = .rectangular, polygonPoints: [RoomPoint] = []) {
+    init(lengthMm: Double = 5000, widthMm: Double = 4000, expansionGapMm: Double = 10, shape: RoomShape = .rectangular, polygonPoints: [RoomPoint] = [], patternType: InstallationPattern = .straight, angleDegrees: Double = 0.0) {
         self.shape = shape
         self.lengthMm = lengthMm
         self.widthMm = widthMm
         self.expansionGapMm = expansionGapMm
         self.polygonPoints = polygonPoints
+        self.patternType = patternType
+        self.angleDegrees = angleDegrees
     }
     
     // Calculate polygon area using shoelace formula
@@ -137,6 +150,20 @@ struct RoomSettings: Codable, Equatable {
         return perimeter
     }
     
+    // Get polygon points (converting rectangle to points if needed)
+    var effectivePolygonPoints: [RoomPoint] {
+        if shape == .rectangular {
+            return [
+                RoomPoint(x: 0, y: 0),
+                RoomPoint(x: lengthMm, y: 0),
+                RoomPoint(x: lengthMm, y: widthMm),
+                RoomPoint(x: 0, y: widthMm)
+            ]
+        } else {
+            return polygonPoints
+        }
+    }
+
     // Check if a point is inside the room (for layout engines)
     func contains(x: Double, y: Double) -> Bool {
         if shape == .rectangular {
