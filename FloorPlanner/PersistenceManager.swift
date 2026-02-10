@@ -523,7 +523,7 @@ public class RoomSettingsEntity: NSManagedObject {
     @NSManaged public var angleDegrees: Double
 
     @NSManaged public var project: ProjectEntity?
-    @NSManaged public var polygonPoints: NSOrderedSet?
+    @NSManaged public var polygonPoints: NSSet?
 }
 
 @objc(RoomPointEntity)
@@ -577,24 +577,6 @@ extension ProjectEntity {
 }
 
 extension RoomSettingsEntity {
-    @objc(insertObject:inPolygonPointsAtIndex:)
-    @NSManaged public func insertIntoPolygonPoints(_ value: RoomPointEntity, at idx: Int)
-
-    @objc(removeObjectFromPolygonPointsAtIndex:)
-    @NSManaged public func removeFromPolygonPoints(at idx: Int)
-
-    @objc(insertPolygonPoints:atIndexes:)
-    @NSManaged public func insertIntoPolygonPoints(_ values: [RoomPointEntity], at indexes: NSIndexSet)
-
-    @objc(removePolygonPointsAtIndexes:)
-    @NSManaged public func removeFromPolygonPoints(at indexes: NSIndexSet)
-
-    @objc(replaceObjectInPolygonPointsAtIndex:withObject:)
-    @NSManaged public func replacePolygonPoints(at idx: Int, with value: RoomPointEntity)
-
-    @objc(replacePolygonPointsAtIndexes:withPolygonPoints:)
-    @NSManaged public func replacePolygonPoints(at indexes: NSIndexSet, with values: [RoomPointEntity])
-
     @objc(addPolygonPointsObject:)
     @NSManaged public func addToPolygonPoints(_ value: RoomPointEntity)
 
@@ -602,8 +584,8 @@ extension RoomSettingsEntity {
     @NSManaged public func removeFromPolygonPoints(_ value: RoomPointEntity)
 
     @objc(addPolygonPoints:)
-    @NSManaged public func addToPolygonPoints(_ values: NSOrderedSet)
+    @NSManaged public func addToPolygonPoints(_ values: NSSet)
 
     @objc(removePolygonPoints:)
-    @NSManaged public func removeFromPolygonPoints(_ values: NSOrderedSet)
+    @NSManaged public func removeFromPolygonPoints(_ values: NSSet)
 }
