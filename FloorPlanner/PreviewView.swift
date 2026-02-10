@@ -90,40 +90,82 @@ struct PreviewView: View {
         let availableWidth = size.width - 2 * marginPx
         let availableHeight = size.height - 2 * marginPx
         
-        let scaleX = availableWidth / room.lengthMm
-        let scaleY = availableHeight / room.widthMm
+        let scaleX = availableWidth / room.boundingLengthMm
+        let scaleY = availableHeight / room.boundingWidthMm
         let baseScale = min(scaleX, scaleY) * scale
         
-        let roomWidthPx = room.lengthMm * baseScale
-        let roomHeightPx = room.widthMm * baseScale
+        let roomWidthPx = room.boundingLengthMm * baseScale
+        let roomHeightPx = room.boundingWidthMm * baseScale
         
         let originX = (size.width - roomWidthPx) / 2 + offset.width
         let originY = (size.height - roomHeightPx) / 2 + offset.height
         
-        // Draw room outline
-        let roomRect = CGRect(x: originX, y: originY, width: roomWidthPx, height: roomHeightPx)
-        context.stroke(
-            Path(roomRect),
-            with: .color(.gray),
-            lineWidth: 2
-        )
-        
-        // Draw usable area
-        let gapPx = room.expansionGapMm * baseScale
-        let usableRect = CGRect(
-            x: originX + gapPx,
-            y: originY + gapPx,
-            width: room.usableLengthMm * baseScale,
-            height: room.usableWidthMm * baseScale
-        )
-        context.stroke(
-            Path(usableRect),
-            with: .color(.blue.opacity(0.5)),
-            style: StrokeStyle(lineWidth: 1, dash: [5, 5])
-        )
+        // Draw room outline based on shape
+        if room.shape == .rectangular {
+            // Draw rectangular room
+            let roomRect = CGRect(x: originX, y: originY, width: roomWidthPx, height: roomHeightPx)
+            context.stroke(
+                Path(roomRect),
+                with: .color(.gray),
+                lineWidth: 2
+            )
+            
+            // Draw usable area
+            let gapPx = room.expansionGapMm * baseScale
+            let usableRect = CGRect(
+                x: originX + gapPx,
+                y: originY + gapPx,
+                width: room.usableLengthMm * baseScale,
+                height: room.usableWidthMm * baseScale
+            )
+            context.stroke(
+                Path(usableRect),
+                with: .color(.blue.opacity(0.5)),
+                style: StrokeStyle(lineWidth: 1, dash: [5, 5])
+            )
+        } else {
+            // Draw polygon room
+            if !room.polygonPoints.isEmpty {
+                // Find min coordinates to normalize
+                let minX = room.polygonPoints.map { $0.x }.min() ?? 0
+                let minY = room.polygonPoints.map { $0.y }.min() ?? 0
+                
+                // Draw polygon outline
+                var path = Path()
+                for (index, point) in room.polygonPoints.enumerated() {
+                    let x = originX + (point.x - minX) * baseScale
+                    let y = originY + (point.y - minY) * baseScale
+                    
+                    if index == 0 {
+                        path.move(to: CGPoint(x: x, y: y))
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    }
+                }
+                path.closeSubpath()
+                
+                context.stroke(
+                    path,
+                    with: .color(.gray),
+                    lineWidth: 2
+                )
+                
+                // Draw points
+                for point in room.polygonPoints {
+                    let x = originX + (point.x - minX) * baseScale
+                    let y = originY + (point.y - minY) * baseScale
+                    
+                    context.fill(
+                        Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+                        with: .color(.blue)
+                    )
+                }
+            }
+        }
         
         // Draw placed pieces
         for piece in result.placedPieces {
+            let gapPx = room.expansionGapMm * baseScale
             let x = originX + gapPx + piece.x * baseScale
             let y = originY + gapPx + piece.y * baseScale
             let width = piece.lengthMm * baseScale

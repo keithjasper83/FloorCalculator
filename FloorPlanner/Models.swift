@@ -14,27 +14,159 @@ enum MaterialType: String, Codable, CaseIterable {
     case carpetTile = "Carpet Tiles"
 }
 
+// MARK: - Room Shape
+
+enum RoomShape: String, Codable, CaseIterable {
+    case rectangular = "Rectangular"
+    case polygon = "Custom Polygon"
+}
+
+// MARK: - Room Point
+
+struct RoomPoint: Codable, Equatable, Identifiable {
+    var id = UUID()
+    var x: Double // mm from origin
+    var y: Double // mm from origin
+    
+    init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
+}
+
 // MARK: - Room Settings
 
 struct RoomSettings: Codable, Equatable {
+    var shape: RoomShape
+    
+    // Rectangular mode properties
     var lengthMm: Double
     var widthMm: Double
     var expansionGapMm: Double
     
+    // Polygon mode properties
+    var polygonPoints: [RoomPoint]
+    
+    // Computed bounding box (works for both modes)
+    var boundingLengthMm: Double {
+        if shape == .rectangular {
+            return lengthMm
+        } else {
+            guard !polygonPoints.isEmpty else { return 0 }
+            let maxX = polygonPoints.map { $0.x }.max() ?? 0
+            let minX = polygonPoints.map { $0.x }.min() ?? 0
+            return maxX - minX
+        }
+    }
+    
+    var boundingWidthMm: Double {
+        if shape == .rectangular {
+            return widthMm
+        } else {
+            guard !polygonPoints.isEmpty else { return 0 }
+            let maxY = polygonPoints.map { $0.y }.max() ?? 0
+            let minY = polygonPoints.map { $0.y }.min() ?? 0
+            return maxY - minY
+        }
+    }
+    
     var usableLengthMm: Double {
-        lengthMm - 2 * expansionGapMm
+        boundingLengthMm - 2 * expansionGapMm
     }
     
     var usableWidthMm: Double {
-        widthMm - 2 * expansionGapMm
+        boundingWidthMm - 2 * expansionGapMm
     }
     
     var grossAreaM2: Double {
-        (lengthMm * widthMm) / 1_000_000
+        if shape == .rectangular {
+            return (lengthMm * widthMm) / 1_000_000
+        } else {
+            return calculatePolygonArea() / 1_000_000
+        }
     }
     
     var usableAreaM2: Double {
-        (usableLengthMm * usableWidthMm) / 1_000_000
+        if shape == .rectangular {
+            return (usableLengthMm * usableWidthMm) / 1_000_000
+        } else {
+            // For polygon, approximate by reducing by expansion gap
+            return max(0, grossAreaM2 - (calculatePerimeter() * expansionGapMm / 1_000_000))
+        }
+    }
+    
+    // Initialize with rectangular shape (default)
+    init(lengthMm: Double = 5000, widthMm: Double = 4000, expansionGapMm: Double = 10, shape: RoomShape = .rectangular, polygonPoints: [RoomPoint] = []) {
+        self.shape = shape
+        self.lengthMm = lengthMm
+        self.widthMm = widthMm
+        self.expansionGapMm = expansionGapMm
+        self.polygonPoints = polygonPoints
+    }
+    
+    // Calculate polygon area using shoelace formula
+    private func calculatePolygonArea() -> Double {
+        guard polygonPoints.count >= 3 else { return 0 }
+        
+        var area: Double = 0
+        let n = polygonPoints.count
+        
+        for i in 0..<n {
+            let j = (i + 1) % n
+            area += polygonPoints[i].x * polygonPoints[j].y
+            area -= polygonPoints[j].x * polygonPoints[i].y
+        }
+        
+        return abs(area / 2.0)
+    }
+    
+    // Calculate polygon perimeter
+    private func calculatePerimeter() -> Double {
+        guard polygonPoints.count >= 2 else { return 0 }
+        
+        var perimeter: Double = 0
+        let n = polygonPoints.count
+        
+        for i in 0..<n {
+            let j = (i + 1) % n
+            let dx = polygonPoints[j].x - polygonPoints[i].x
+            let dy = polygonPoints[j].y - polygonPoints[i].y
+            perimeter += sqrt(dx * dx + dy * dy)
+        }
+        
+        return perimeter
+    }
+    
+    // Check if a point is inside the room (for layout engines)
+    func contains(x: Double, y: Double) -> Bool {
+        if shape == .rectangular {
+            return x >= 0 && x <= lengthMm && y >= 0 && y <= widthMm
+        } else {
+            return pointInPolygon(x: x, y: y)
+        }
+    }
+    
+    // Ray casting algorithm for point-in-polygon test
+    private func pointInPolygon(x: Double, y: Double) -> Bool {
+        guard polygonPoints.count >= 3 else { return false }
+        
+        var inside = false
+        let n = polygonPoints.count
+        
+        var j = n - 1
+        for i in 0..<n {
+            let xi = polygonPoints[i].x
+            let yi = polygonPoints[i].y
+            let xj = polygonPoints[j].x
+            let yj = polygonPoints[j].y
+            
+            if ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+                inside = !inside
+            }
+            j = i
+        }
+        
+        return inside
     }
 }
 
