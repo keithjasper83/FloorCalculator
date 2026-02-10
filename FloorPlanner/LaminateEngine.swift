@@ -22,12 +22,12 @@ class LaminateEngine: LayoutEngine {
         let primaryWidth = determinePrimaryWidth(stockItems: project.stockItems, settings: settings)
         
         // Collect available pieces
-        var availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource)] = []
+        var availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)] = []
         
         if useStock && !project.stockItems.isEmpty {
             for item in project.stockItems where item.widthMm == primaryWidth {
                 for _ in 0..<item.quantity {
-                    availablePieces.append((item.lengthMm, item.widthMm, .stock))
+                    availablePieces.append((item.lengthMm, item.widthMm, .stock, item.pricePerUnit))
                 }
             }
         }
@@ -38,6 +38,7 @@ class LaminateEngine: LayoutEngine {
         var placedPieces: [PlacedPiece] = []
         var cutRecords: [CutRecord] = []
         var offcuts: [(length: Double, width: Double)] = []
+        var usedStockCost = 0.0
         var rowIndex = 0
         
         // Determine row direction
@@ -77,69 +78,100 @@ class LaminateEngine: LayoutEngine {
             
             lastRowStartOffset = rowStartOffset
             
-            // Place planks in this row
-            var currentX = 0.0
-            var needsStartCut = rowStartOffset > 0.0
+            // Get valid segments for this row (intersects with polygon)
+            let segments = getSegments(room: room, rowCenterY: rowY + primaryWidth/2)
             
-            while currentX < rowLength {
-                let remainingLength = rowLength - currentX
+            // Fill each segment
+            for (segStart, segEnd) in segments {
+                var currentX = segStart
                 
-                // Try to find a piece that fits
-                var pieceIndex = -1
-                var selectedPiece: (length: Double, width: Double, source: PlacedPiece.PieceSource)?
-                
-                // First try offcuts
-                for (index, offcut) in offcuts.enumerated() {
-                    if offcut.length >= settings.minOffcutLengthMm && offcut.length <= remainingLength + 1.0 {
-                        pieceIndex = -1000 - index // negative to identify as offcut
-                        selectedPiece = (offcut.length, offcut.width, .offcut)
-                        break
+                while currentX < segEnd {
+                    // Determine target length for this piece based on pattern alignment
+                    // Pattern aligns to rowStartOffset relative to 0
+
+                    let k = floor((currentX - rowStartOffset) / settings.defaultPlankLengthMm) + 1
+                    let nextJointX = rowStartOffset + k * settings.defaultPlankLengthMm
+
+                    let distToJoint = nextJointX - currentX
+                    let distToEnd = segEnd - currentX
+
+                    let targetLength = min(distToJoint, distToEnd)
+                    if targetLength < 1.0 {
+                        currentX += 1.0
+                        continue
                     }
-                }
-                
-                // Then try available stock
-                if selectedPiece == nil {
-                    for (index, piece) in availablePieces.enumerated() {
-                        pieceIndex = index
-                        selectedPiece = piece
-                        break
+
+                    // Try to find a piece that fits targetLength
+                    // We need a piece of at least targetLength.
+                    // If we use stock (typically defaultPlankLength), we cut it down.
+                    // If we use offcut, it must be >= targetLength.
+
+                    var pieceIndex = -1
+                    var selectedPiece: (length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)?
+
+                    // First try offcuts
+                    for (index, offcut) in offcuts.enumerated() {
+                        if offcut.length >= targetLength {
+                            pieceIndex = -1000 - index
+                            // Offcuts are free (cost attributed to parent)
+                            selectedPiece = (offcut.length, offcut.width, .offcut, nil)
+                            break
+                        }
                     }
-                }
-                
-                guard var piece = selectedPiece else {
-                    // No stock available - use NEEDED pieces
-                    let neededLength = min(settings.defaultPlankLengthMm, remainingLength)
-                    let label = "N\(placedPieces.count + 1)"
                     
-                    let placedPiece = PlacedPiece(
-                        x: currentX,
-                        y: rowY,
-                        lengthMm: neededLength,
-                        widthMm: primaryWidth,
-                        label: label,
-                        source: .needed,
-                        status: .needed,
-                        rotation: 0
-                    )
-                    placedPieces.append(placedPiece)
-                    currentX += neededLength
-                    continue
-                }
-                
-                // Remove piece from available or offcuts
-                if pieceIndex >= 0 {
-                    availablePieces.remove(at: pieceIndex)
-                } else {
-                    let offcutIndex = -pieceIndex - 1000
-                    offcuts.remove(at: offcutIndex)
-                }
-                
-                // Handle start cut
-                if needsStartCut && rowStartOffset > 0 {
-                    let cutLength = rowStartOffset
-                    if piece.length > cutLength + settings.minOffcutLengthMm {
-                        // Create offcut
-                        let offcutLength = piece.length - cutLength
+                    // Then try available stock
+                    if selectedPiece == nil {
+                        for (index, piece) in availablePieces.enumerated() {
+                            if piece.length >= targetLength {
+                                pieceIndex = index
+                                selectedPiece = piece
+                                break
+                            }
+                        }
+                    }
+
+                    guard var piece = selectedPiece else {
+                        // No stock available - use NEEDED pieces
+                        let label = "N\(placedPieces.count + 1)"
+                        let placedPiece = PlacedPiece(
+                            x: currentX,
+                            y: rowY,
+                            lengthMm: targetLength,
+                            widthMm: primaryWidth,
+                            label: label,
+                            source: .needed,
+                            status: .needed,
+                            rotation: 0
+                        )
+                        placedPieces.append(placedPiece)
+                        currentX += targetLength
+                        continue
+                    }
+
+                    // Remove piece from available or offcuts
+                    if pieceIndex >= 0 {
+                        availablePieces.remove(at: pieceIndex)
+                        if let price = piece.price {
+                            usedStockCost += price
+                        }
+                    } else {
+                        let offcutIndex = -pieceIndex - 1000
+                        offcuts.remove(at: offcutIndex)
+                    }
+
+                    // Cut logic
+                    // We have 'piece' of length 'piece.length'. We need 'targetLength'.
+                    // Cut piece to targetLength. Remainder is offcut.
+
+                    var cutType: CutRecord.LaminateCutType? = nil
+                    if abs(currentX - segStart) < 1.0 {
+                        cutType = .startCut
+                    } else if abs(currentX + targetLength - segEnd) < 1.0 {
+                        cutType = .endCut
+                    }
+
+                    if piece.length > targetLength + 1.0 { // Tolerance
+                        let offcutLength = piece.length - targetLength
                         if offcutLength >= settings.minOffcutLengthMm {
                             offcuts.append((offcutLength, piece.width))
                         }
@@ -147,54 +179,29 @@ class LaminateEngine: LayoutEngine {
                         cutRecords.append(CutRecord(
                             materialType: .laminate,
                             row: row,
-                            cutType: .startCut,
+                            cutType: cutType ?? .endCut, // Middle cuts are rare unless using long stock? Usually we cut to fit joint or wall.
                             fromLengthMm: piece.length,
-                            cutToMm: cutLength,
+                            cutToMm: targetLength,
                             offcutLengthMm: offcutLength,
                             widthMm: piece.width
                         ))
-                        
-                        piece.length = cutLength
-                    }
-                    needsStartCut = false
-                }
-                
-                // Check if piece needs end cut
-                let actualLength: Double
-                if piece.length > remainingLength {
-                    actualLength = remainingLength
-                    let offcutLength = piece.length - remainingLength
-                    if offcutLength >= settings.minOffcutLengthMm {
-                        offcuts.append((offcutLength, piece.width))
                     }
                     
-                    cutRecords.append(CutRecord(
-                        materialType: .laminate,
-                        row: row,
-                        cutType: .endCut,
-                        fromLengthMm: piece.length,
-                        cutToMm: remainingLength,
-                        offcutLengthMm: offcutLength,
-                        widthMm: piece.width
-                    ))
-                } else {
-                    actualLength = piece.length
+                    let label = piece.source == .offcut ? "O\(placedPieces.count + 1)" : "S\(placedPieces.count + 1)"
+
+                    let placedPiece = PlacedPiece(
+                        x: currentX,
+                        y: rowY,
+                        lengthMm: targetLength,
+                        widthMm: piece.width,
+                        label: label,
+                        source: piece.source,
+                        status: .installed,
+                        rotation: 0
+                    )
+                    placedPieces.append(placedPiece)
+                    currentX += targetLength
                 }
-                
-                let label = piece.source == .offcut ? "O\(placedPieces.count + 1)" : "S\(placedPieces.count + 1)"
-                
-                let placedPiece = PlacedPiece(
-                    x: currentX,
-                    y: rowY,
-                    lengthMm: actualLength,
-                    widthMm: piece.width,
-                    label: label,
-                    source: piece.source,
-                    status: .installed,
-                    rotation: 0
-                )
-                placedPieces.append(placedPiece)
-                currentX += actualLength
             }
             
             currentY += primaryWidth
@@ -230,14 +237,24 @@ class LaminateEngine: LayoutEngine {
         
         // Generate purchase suggestions
         var purchaseSuggestions: [PurchaseSuggestion] = []
+        var purchaseCost = 0.0
+
         if neededAreaM2 > 0 {
             let neededCount = placedPieces.filter { $0.status == .needed }.count
             if neededCount > 0 {
+                var estimatedCost: Double?
+                if let defaultPrice = settings.defaultPricePerPlank {
+                    let cost = defaultPrice * Double(neededCount)
+                    estimatedCost = cost
+                    purchaseCost += cost
+                }
+
                 purchaseSuggestions.append(PurchaseSuggestion(
                     unitLengthMm: settings.defaultPlankLengthMm,
                     unitWidthMm: primaryWidth,
                     quantityNeeded: neededCount,
-                    packsNeeded: nil
+                    packsNeeded: nil,
+                    estimatedCost: estimatedCost
                 ))
             }
         }
@@ -250,7 +267,8 @@ class LaminateEngine: LayoutEngine {
             installedAreaM2: installedAreaM2,
             neededAreaM2: neededAreaM2,
             wasteAreaM2: wasteAreaM2,
-            surplusAreaM2: surplusAreaM2
+            surplusAreaM2: surplusAreaM2,
+            totalCost: usedStockCost + purchaseCost
         )
     }
     
@@ -272,16 +290,79 @@ class LaminateEngine: LayoutEngine {
         return settings.defaultPlankWidthMm
     }
     
-    private func emptyResult() -> LayoutResult {
-        return LayoutResult(
-            placedPieces: [],
-            cutRecords: [],
-            remainingPieces: [],
-            purchaseSuggestions: [],
-            installedAreaM2: 0,
-            neededAreaM2: 0,
-            wasteAreaM2: 0,
-            surplusAreaM2: 0
-        )
+    // Helper to find valid segments for a row in a polygon room
+    private func getSegments(room: RoomSettings, rowCenterY: Double) -> [(Double, Double)] {
+        // If rectangular, just return full width
+        if room.shape == .rectangular {
+            return [(0.0, room.usableLengthMm)]
+        }
+
+        guard !room.polygonPoints.isEmpty else {
+             return [(0.0, room.usableLengthMm)]
+        }
+
+        // Calculate offset for room coordinates
+        let minX = room.polygonPoints.map { $0.x }.min() ?? 0
+        let minY = room.polygonPoints.map { $0.y }.min() ?? 0
+
+        // Convert layout Y to room Y
+        // Layout origin is at (minX + gap, minY + gap) relative to polygon origin
+        let roomY = rowCenterY + minY + room.expansionGapMm
+
+        var intersections: [Double] = []
+        let points = room.polygonPoints
+        let n = points.count
+
+        for i in 0..<n {
+            let j = (i + 1) % n
+            let p1 = points[i]
+            let p2 = points[j]
+
+            // Check edge intersection with y = roomY
+            // Handle horizontal edges: skip them (they don't cross scanline, they ARE scanline)
+            // But if scanline is exactly on edge, we might have issues.
+            // Standard ray casting rule: (p1.y <= Y < p2.y) or (p2.y <= Y < p1.y)
+            if (p1.y <= roomY && p2.y > roomY) || (p2.y <= roomY && p1.y > roomY) {
+                // Calculate x
+                // x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+                // Avoid division by zero (guaranteed by condition p1.y != p2.y)
+                let t = (roomY - p1.y) / (p2.y - p1.y)
+                let x = p1.x + t * (p2.x - p1.x)
+                intersections.append(x)
+            }
+        }
+
+        intersections.sort()
+
+        var segments: [(Double, Double)] = []
+        var i = 0
+        while i < intersections.count - 1 {
+            let start = intersections[i]
+            let end = intersections[i+1]
+
+            // Convert back to layout coordinates
+            // Layout X = Room X - minX - gap
+            let layoutStart = start - minX - room.expansionGapMm
+            let layoutEnd = end - minX - room.expansionGapMm
+
+            // Clip to bounding box just in case
+            // Bounding box for usable area is 0 to usableLength
+            let validStart = max(0, layoutStart)
+            let validEnd = min(room.usableLengthMm, layoutEnd)
+
+            if validEnd > validStart {
+                segments.append((validStart, validEnd))
+            }
+            i += 2
+        }
+
+        // Fallback if no intersections found but we are within Y bounds of the polygon?
+        // If scanline misses (e.g. gap), segments is empty. Correct.
+        // If rectangular mode fell through (shouldn't happen), return bounds.
+
+        // If segments is empty but we expect something?
+        // For polygon, if we are outside the polygon, segments is empty. Correct.
+
+        return segments
     }
 }

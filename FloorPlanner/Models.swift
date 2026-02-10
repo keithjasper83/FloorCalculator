@@ -177,9 +177,15 @@ struct StockItem: Codable, Equatable, Identifiable {
     var lengthMm: Double
     var widthMm: Double
     var quantity: Int
+    var pricePerUnit: Double?
     
     var areaM2: Double {
         (lengthMm * widthMm * Double(quantity)) / 1_000_000
+    }
+
+    var totalValue: Double {
+        guard let price = pricePerUnit else { return 0 }
+        return price * Double(quantity)
     }
 }
 
@@ -191,6 +197,7 @@ struct LaminateSettings: Codable, Equatable {
     var plankDirection: PlankDirection
     var defaultPlankLengthMm: Double
     var defaultPlankWidthMm: Double
+    var defaultPricePerPlank: Double?
     
     enum PlankDirection: String, Codable, CaseIterable {
         case alongLength = "Along Length"
@@ -206,6 +213,7 @@ struct TileSettings: Codable, Equatable {
     var orientation: TileOrientation
     var reuseEdgeOffcuts: Bool
     var tilesPerBox: Int?
+    var defaultPricePerTile: Double?
     
     enum TilePattern: String, Codable, CaseIterable {
         case straight = "Straight Grid"
@@ -292,6 +300,7 @@ struct PurchaseSuggestion: Codable, Equatable, Identifiable {
     var unitWidthMm: Double
     var quantityNeeded: Int
     var packsNeeded: Int?
+    var estimatedCost: Double?
     
     var totalAreaM2: Double {
         (unitLengthMm * unitWidthMm * Double(quantityNeeded)) / 1_000_000
@@ -311,6 +320,8 @@ struct LayoutResult: Codable, Equatable {
     var wasteAreaM2: Double
     var surplusAreaM2: Double
     
+    var totalCost: Double
+
     var isComplete: Bool {
         neededAreaM2 <= 0.01 // tolerance
     }
@@ -321,6 +332,7 @@ struct LayoutResult: Codable, Equatable {
 struct Project: Codable, Equatable {
     var id = UUID()
     var name: String
+    var currency: String // e.g., "USD", "EUR"
     var materialType: MaterialType
     var roomSettings: RoomSettings
     var stockItems: [StockItem]
@@ -334,6 +346,7 @@ struct Project: Codable, Equatable {
     
     init(
         name: String = "New Project",
+        currency: String = "USD",
         materialType: MaterialType = .laminate,
         roomSettings: RoomSettings = RoomSettings(lengthMm: 5000, widthMm: 4000, expansionGapMm: 10),
         stockItems: [StockItem] = [],
@@ -341,6 +354,7 @@ struct Project: Codable, Equatable {
     ) {
         self.id = UUID()
         self.name = name
+        self.currency = currency
         self.materialType = materialType
         self.roomSettings = roomSettings
         self.stockItems = stockItems
@@ -357,7 +371,8 @@ struct Project: Codable, Equatable {
                 minOffcutLengthMm: 150,
                 plankDirection: .alongLength,
                 defaultPlankLengthMm: 1000,
-                defaultPlankWidthMm: 300
+                defaultPlankWidthMm: 300,
+                defaultPricePerPlank: nil
             )
         } else {
             self.tileSettings = TileSettings(
@@ -365,7 +380,8 @@ struct Project: Codable, Equatable {
                 pattern: .straight,
                 orientation: .monolithic,
                 reuseEdgeOffcuts: false,
-                tilesPerBox: nil
+                tilesPerBox: nil,
+                defaultPricePerTile: nil
             )
         }
     }
