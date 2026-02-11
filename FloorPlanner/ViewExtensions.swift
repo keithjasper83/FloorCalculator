@@ -9,7 +9,7 @@ import SwiftUI
 
 #if os(macOS)
 enum UIKeyboardType {
-    case default
+    case `default`
     case asciiCapable
     case numbersAndPunctuation
     case URL
