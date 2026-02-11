@@ -13,6 +13,12 @@ struct Constants {
     /// Tolerance for floating point comparisons and geometry checks (mm)
     static let geometryToleranceMm: Double = 0.1
 
+    /// Tolerance for area comparisons (m²)
+    static let areaToleranceM2: Double = 0.01
+
+    /// Tolerance for angular comparisons (degrees)
+    static let angleToleranceDegrees: Double = 0.1
+
     /// Slightly larger tolerance for snapping/alignment (mm)
     static let snapToleranceMm: Double = 1.0
 

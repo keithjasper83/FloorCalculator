@@ -45,6 +45,14 @@ class CalculatedEngine: LayoutEngine {
                      unitName = "m³"
                  }
              }
+        } else if material.calculationType == .discrete && material.category == .wallCovering {
+             // Handle simple discrete sheet calculation (e.g. Plasterboard)
+             // Area / Sheet Area
+             if let len = material.defaultLengthMm, let wid = material.defaultWidthMm, len > 0, wid > 0 {
+                 let sheetAreaM2 = (len * wid) / 1_000_000.0
+                 quantityNeeded = areaM2 / sheetAreaM2
+                 unitName = "Sheets"
+             }
         }
 
         // Calculate Cost
@@ -54,6 +62,7 @@ class CalculatedEngine: LayoutEngine {
         }
 
         // Generate Suggestion
+        // Use quantityValue (Double) to preserve fractional quantities; UI is responsible for any rounding/formatting.
         let suggestion = PurchaseSuggestion(
             id: UUID(),
             unitLengthMm: 0,
@@ -65,7 +74,7 @@ class CalculatedEngine: LayoutEngine {
         )
 
         return LayoutResult(
-            placedPieces: [], // No individual pieces for continuous
+            placedPieces: [], // No individual pieces for continuous/calculated
             cutRecords: [],
             remainingPieces: [],
             purchaseSuggestions: [suggestion],
