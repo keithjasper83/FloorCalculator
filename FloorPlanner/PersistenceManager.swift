@@ -182,8 +182,8 @@ class PersistenceManager: ObservableObject {
         project.createdAt = entity.createdAt ?? Date()
         project.modifiedAt = entity.modifiedAt ?? Date()
 
-        // Restore layer thickness if it was persisted
-        if entity.layerThicknessMm > 0, !project.layers.isEmpty {
+        // Restore layer thickness if it was persisted (even if zero)
+        if !project.layers.isEmpty {
             project.layers[0].thicknessMm = entity.layerThicknessMm
         }
 

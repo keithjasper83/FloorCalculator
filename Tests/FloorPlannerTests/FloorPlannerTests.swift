@@ -303,7 +303,7 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(result.installedAreaM2, 49.9002, accuracy: 0.01) // usable area
         XCTAssertEqual(result.neededAreaM2, 0, accuracy: 0.01)
         
-        // Check cost calculation (20.0 per liter * 5 liters = 100.0)
+        // Check cost calculation: 49.9002 m² / 10 m²/liter * 20.0 per liter = 99.8004
         XCTAssertEqual(result.totalCost, 99.8004, accuracy: 0.1)
     }
     
@@ -333,7 +333,7 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(result.installedAreaM2, 49.9002, accuracy: 0.01)
         XCTAssertEqual(result.neededAreaM2, 0, accuracy: 0.01)
         
-        // Check cost calculation (150.0 per m³ * 4.99002 m³)
+        // Check cost calculation: 49.9002 m² * 0.1 m * 150.0 per m³ = 748.503
         XCTAssertEqual(result.totalCost, 748.503, accuracy: 0.1)
     }
     
