@@ -275,3 +275,106 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertTrue(rectRoom.contains(x: 2500, y: 2000))
         XCTAssertFalse(rectRoom.contains(x: 6000, y: 2000))
     }
+    
+    // MARK: - CalculatedEngine Tests
+    
+    func testCalculatedEngineWithPaint() {
+        // Test paint calculation (coverage-based)
+        let paintMaterial = Material.paint
+        let engine = CalculatedEngine(material: paintMaterial, thicknessMm: 0)
+        
+        // 10m x 5m room = 50 m²
+        let project = Project(
+            name: "Test Paint",
+            materialType: .paint,
+            roomSettings: RoomSettings(lengthMm: 10000, widthMm: 5000, expansionGapMm: 10),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+        
+        let result = engine.generateLayout(project: project, useStock: false)
+        
+        // Paint has 10 m² per liter coverage, so 50 m² / 10 = 5 liters
+        XCTAssertEqual(result.purchaseSuggestions.count, 1)
+        XCTAssertEqual(result.purchaseSuggestions[0].quantityValue, 5.0, accuracy: 0.01)
+        XCTAssertEqual(result.purchaseSuggestions[0].unitName, "Liter")
+        
+        // Should have full coverage
+        XCTAssertEqual(result.installedAreaM2, 49.9002, accuracy: 0.01) // usable area
+        XCTAssertEqual(result.neededAreaM2, 0, accuracy: 0.01)
+        
+        // Check cost calculation (20.0 per liter * 5 liters = 100.0)
+        XCTAssertEqual(result.totalCost, 99.8004, accuracy: 0.1)
+    }
+    
+    func testCalculatedEngineWithConcrete() {
+        // Test concrete calculation (volume-based)
+        let concreteMaterial = Material.concrete
+        let thickness = 100.0 // 100mm = 0.1m
+        let engine = CalculatedEngine(material: concreteMaterial, thicknessMm: thickness)
+        
+        // 10m x 5m room = 50 m²
+        let project = Project(
+            name: "Test Concrete",
+            materialType: .concrete,
+            roomSettings: RoomSettings(lengthMm: 10000, widthMm: 5000, expansionGapMm: 10),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+        
+        let result = engine.generateLayout(project: project, useStock: false)
+        
+        // Volume = 49.9002 m² * 0.1 m = 4.99002 m³
+        XCTAssertEqual(result.purchaseSuggestions.count, 1)
+        XCTAssertEqual(result.purchaseSuggestions[0].quantityValue, 4.99002, accuracy: 0.01)
+        XCTAssertEqual(result.purchaseSuggestions[0].unitName, "m³")
+        
+        // Should have full coverage
+        XCTAssertEqual(result.installedAreaM2, 49.9002, accuracy: 0.01)
+        XCTAssertEqual(result.neededAreaM2, 0, accuracy: 0.01)
+        
+        // Check cost calculation (150.0 per m³ * 4.99002 m³)
+        XCTAssertEqual(result.totalCost, 748.503, accuracy: 0.1)
+    }
+    
+    func testCalculatedEngineWithZeroThickness() {
+        // Test with zero thickness (should fall back to default or handle gracefully)
+        let concreteMaterial = Material.concrete
+        let engine = CalculatedEngine(material: concreteMaterial, thicknessMm: 0)
+        
+        let project = Project(
+            name: "Test Zero Thickness",
+            materialType: .concrete,
+            roomSettings: RoomSettings(lengthMm: 5000, widthMm: 4000, expansionGapMm: 10),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+        
+        let result = engine.generateLayout(project: project, useStock: false)
+        
+        // With zero thickness, volume should be 0
+        XCTAssertEqual(result.purchaseSuggestions[0].quantityValue, 0.0, accuracy: 0.01)
+    }
+    
+    func testCalculatedEnginePrecision() {
+        // Test that fractional quantities are preserved
+        let paintMaterial = Material.paint
+        let engine = CalculatedEngine(material: paintMaterial, thicknessMm: 0)
+        
+        // 15.5 m² area
+        let project = Project(
+            name: "Test Precision",
+            materialType: .paint,
+            roomSettings: RoomSettings(lengthMm: 5000, widthMm: 3100, expansionGapMm: 0),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+        
+        let result = engine.generateLayout(project: project, useStock: false)
+        
+        // Paint has 10 m² per liter coverage, so 15.5 m² / 10 = 1.55 liters
+        XCTAssertEqual(result.purchaseSuggestions[0].quantityValue, 1.55, accuracy: 0.01)
+        // quantityNeeded should round up
+        XCTAssertEqual(result.purchaseSuggestions[0].quantityNeeded, 2)
+    }
+}
