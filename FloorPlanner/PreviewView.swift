@@ -109,150 +109,177 @@ struct PreviewView: View {
         let originX = (size.width - roomWidthPx) / 2 + offset.width
         let originY = (size.height - roomHeightPx) / 2 + offset.height
         
-        // Draw room outline based on shape
+        // Determine room path
+        var roomPath = Path()
         if room.shape == .rectangular {
-            // Draw rectangular room
-            let roomRect = CGRect(x: originX, y: originY, width: roomWidthPx, height: roomHeightPx)
-            context.stroke(
-                Path(roomRect),
-                with: .color(.gray),
-                lineWidth: 2
-            )
-            
-            // Draw usable area
-            let gapPx = room.expansionGapMm * baseScale
-            let usableRect = CGRect(
-                x: originX + gapPx,
-                y: originY + gapPx,
-                width: room.usableLengthMm * baseScale,
-                height: room.usableWidthMm * baseScale
-            )
-            context.stroke(
-                Path(usableRect),
-                with: .color(.blue.opacity(0.5)),
-                style: StrokeStyle(lineWidth: 1, dash: [5, 5])
-            )
-        } else {
-            // Draw polygon room
-            if !room.polygonPoints.isEmpty {
-                // Find min coordinates to normalize
-                let minX = room.polygonPoints.map { $0.x }.min() ?? 0
-                let minY = room.polygonPoints.map { $0.y }.min() ?? 0
-                
-                // Draw polygon outline
-                var path = Path()
-                for (index, point) in room.polygonPoints.enumerated() {
-                    let x = originX + (point.x - minX) * baseScale
-                    let y = originY + (point.y - minY) * baseScale
-                    
-                    if index == 0 {
-                        path.move(to: CGPoint(x: x, y: y))
-                    } else {
-                        path.addLine(to: CGPoint(x: x, y: y))
-                    }
-                }
-                path.closeSubpath()
-                
-                context.stroke(
-                    path,
-                    with: .color(.gray),
-                    lineWidth: 2
-                )
-                
-                // Draw points
-                for point in room.polygonPoints {
-                    let x = originX + (point.x - minX) * baseScale
-                    let y = originY + (point.y - minY) * baseScale
-                    
-                    context.fill(
-                        Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
-                        with: .color(.blue)
-                    )
-                }
-            }
+             let roomRect = CGRect(x: originX, y: originY, width: roomWidthPx, height: roomHeightPx)
+             roomPath = Path(roomRect)
+        } else if !room.polygonPoints.isEmpty {
+             let minX = room.polygonPoints.map { $0.x }.min() ?? 0
+             let minY = room.polygonPoints.map { $0.y }.min() ?? 0
+
+             roomPath.move(to: CGPoint(x: originX, y: originY)) // Start
+
+             for (index, point) in room.polygonPoints.enumerated() {
+                 let x = originX + (point.x - minX) * baseScale
+                 let y = originY + (point.y - minY) * baseScale
+
+                 if index == 0 {
+                     roomPath.move(to: CGPoint(x: x, y: y))
+                 } else {
+                     roomPath.addLine(to: CGPoint(x: x, y: y))
+                 }
+             }
+             roomPath.closeSubpath()
         }
-        
-        // Draw placed pieces
-        for piece in result.placedPieces {
-            let gapPx = room.expansionGapMm * baseScale
-            let x = originX + gapPx + piece.x * baseScale
-            let y = originY + gapPx + piece.y * baseScale
-            let width = piece.lengthMm * baseScale
-            let height = piece.widthMm * baseScale
-            
-            // Handle rotation
-            let centerX = x + width / 2
-            let centerY = y + height / 2
 
-            // Create path centered at 0,0
-            let centeredRect = CGRect(x: -width/2, y: -height/2, width: width, height: height)
-            var transformedPath = Path(centeredRect)
+        // Draw room outline
+        context.stroke(roomPath, with: .color(.gray), lineWidth: 2)
 
-            // Apply rotation and translation
-            let rotationTransform = CGAffineTransform(rotationAngle: piece.rotation * .pi / 180.0)
-            let translationTransform = CGAffineTransform(translationX: centerX, y: centerY)
+        // Draw Usable Area Outline (inset by gap)
+        // Note: Accurately insetting arbitrary polygon is complex.
+        // For rectangle it's easy. For polygon, we approximate or skip if complex.
+        // For continuous material, we might just fill the room path if gap is negligible visually or handled elsewhere.
+        // But let's try to draw the gap line for context.
 
-            let combinedTransform = rotationTransform.concatenating(translationTransform)
+        if room.shape == .rectangular {
+             let gapPx = room.expansionGapMm * baseScale
+             let usableRect = CGRect(
+                 x: originX + gapPx,
+                 y: originY + gapPx,
+                 width: room.usableLengthMm * baseScale,
+                 height: room.usableWidthMm * baseScale
+             )
+             context.stroke(
+                 Path(usableRect),
+                 with: .color(.blue.opacity(0.5)),
+                 style: StrokeStyle(lineWidth: 1, dash: [5, 5])
+             )
+        }
 
-            let path = transformedPath.applying(combinedTransform)
-            
-            // Color based on status
-            let fillColor: Color
-            let strokeColor: Color
-            let strokeStyle: StrokeStyle
-            
-            switch piece.status {
-            case .installed:
-                fillColor = .green.opacity(0.3)
-                strokeColor = .green
-                strokeStyle = StrokeStyle(lineWidth: 1)
-            case .needed:
-                fillColor = .red.opacity(0.2)
-                strokeColor = .red
-                strokeStyle = StrokeStyle(lineWidth: 1, dash: [3, 3])
-            }
-            
-            context.fill(path, with: .color(fillColor))
-            context.stroke(path, with: .color(strokeColor), style: strokeStyle)
-            
-            // Draw label if piece is large enough
-            if width > 30 && height > 15 {
+        // Draw Content
+        if !result.placedPieces.isEmpty {
+            // Draw discrete pieces
+            for piece in result.placedPieces {
+                let gapPx = room.expansionGapMm * baseScale
+                let x = originX + gapPx + piece.x * baseScale
+                let y = originY + gapPx + piece.y * baseScale
+                let width = piece.lengthMm * baseScale
+                let height = piece.widthMm * baseScale
+                
+                // Handle rotation
                 let centerX = x + width / 2
                 let centerY = y + height / 2
-                context.draw(
-                    Text(piece.label)
-                        .font(.system(size: 8))
-                        .foregroundColor(.primary),
-                    at: CGPoint(x: centerX, y: centerY)
-                )
+
+                // Create path centered at 0,0
+                let centeredRect = CGRect(x: -width/2, y: -height/2, width: width, height: height)
+                let rectPath = Path(centeredRect)
+
+                // Apply rotation and translation using context transform is easier if we push/pop,
+                // but Swift Canvas uses context.withCGContext or purely Path transforms.
+                // Path transform:
+                let transform = CGAffineTransform(rotationAngle: piece.rotation * .pi / 180.0)
+                    .concatenating(CGAffineTransform(translationX: centerX, y: centerY))
+
+                let path = rectPath.applying(transform)
+
+                // Color based on status
+                let fillColor: Color
+                let strokeColor: Color
+                let strokeStyle: StrokeStyle
+
+                switch piece.status {
+                case .installed:
+                    fillColor = .green.opacity(0.3)
+                    strokeColor = .green
+                    strokeStyle = StrokeStyle(lineWidth: 1)
+                case .needed:
+                    fillColor = .red.opacity(0.2)
+                    strokeColor = .red
+                    strokeStyle = StrokeStyle(lineWidth: 1, dash: [3, 3])
+                }
+                
+                context.fill(path, with: .color(fillColor))
+                context.stroke(path, with: .color(strokeColor), style: strokeStyle)
+                
+                // Draw label if piece is large enough
+                if width > 30 && height > 15 {
+                     // Swift Canvas text drawing is simple
+                     let text = Text(piece.label)
+                         .font(.system(size: 8))
+                         .foregroundColor(.primary)
+                     context.draw(text, at: CGPoint(x: centerX, y: centerY))
+                }
             }
+        } else if result.installedAreaM2 > 0 {
+             // Continuous material fill
+             // Fill the usable area (or room area if simple)
+             // Determine color based on material type
+             let materialType = appState.currentProject.materialType
+             var fillColor: Color = .gray.opacity(0.3)
+
+             switch materialType {
+             case .concrete: fillColor = .gray.opacity(0.5)
+             case .paint: fillColor = .blue.opacity(0.3)
+             case .plasterboard: fillColor = .white.opacity(0.8) // Might be invisible on white bg, check scheme
+             default: fillColor = .green.opacity(0.3)
+             }
+
+             // If Rectangular, fill usable rect
+             if room.shape == .rectangular {
+                 let gapPx = room.expansionGapMm * baseScale
+                 let usableRect = CGRect(
+                     x: originX + gapPx,
+                     y: originY + gapPx,
+                     width: room.usableLengthMm * baseScale,
+                     height: room.usableWidthMm * baseScale
+                 )
+                 context.fill(Path(usableRect), with: .color(fillColor))
+
+                 // Add label in center
+                 context.draw(Text(materialType.rawValue), at: CGPoint(x: originX + roomWidthPx/2, y: originY + roomHeightPx/2))
+             } else {
+                 // For polygon, filling the room path (ignoring gap for simple preview)
+                 context.fill(roomPath, with: .color(fillColor))
+                 context.draw(Text(materialType.rawValue), at: CGPoint(x: originX + roomWidthPx/2, y: originY + roomHeightPx/2))
+             }
         }
     }
     
     private var legendView: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Rectangle()
-                    .fill(Color.green.opacity(0.3))
-                    .frame(width: 20, height: 20)
-                    .overlay(
-                        Rectangle()
-                            .stroke(Color.green, lineWidth: 1)
-                    )
-                Text("Installed")
-                    .font(.caption)
-            }
-            
-            HStack(spacing: 8) {
-                Rectangle()
-                    .fill(Color.red.opacity(0.2))
-                    .frame(width: 20, height: 20)
-                    .overlay(
-                        Rectangle()
-                            .stroke(Color.red, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    )
-                Text("Needed")
-                    .font(.caption)
+            if appState.currentProject.materialType.toDomainMaterial.calculationType == .discrete {
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color.green.opacity(0.3))
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.green, lineWidth: 1)
+                        )
+                    Text("Installed")
+                        .font(.caption)
+                }
+
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color.red.opacity(0.2))
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.red, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        )
+                    Text("Needed")
+                        .font(.caption)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.5)) // Generic fill for legend
+                        .frame(width: 20, height: 20)
+                    Text("Coverage Area")
+                        .font(.caption)
+                }
             }
             
             HStack(spacing: 8) {

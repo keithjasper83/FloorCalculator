@@ -10,42 +10,9 @@ import Foundation
 class LaminateEngine: LayoutEngine {
     
     func generateLayout(project: Project, useStock: Bool) -> LayoutResult {
-        // Check for diagonal pattern
-        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > 0.1 {
-            let transform = LayoutTransform(room: project.roomSettings, angleDegrees: project.roomSettings.angleDegrees)
-            let rotatedRoom = transform.rotatedRoom(from: project.roomSettings)
-
-            var rotatedProject = project
-            rotatedProject.roomSettings = rotatedRoom
-            // Ensure pattern type is straight for the internal engine
-            rotatedProject.roomSettings.patternType = .straight
-            rotatedProject.roomSettings.angleDegrees = 0
-
-            let result = generateLayoutInternal(project: rotatedProject, useStock: useStock)
-
-            // Transform pieces back
-            let transformedPieces = result.placedPieces.map { transform.transformBack($0) }
-
-            var finalResult = result
-            finalResult.placedPieces = transformedPieces
-            return finalResult
+        return generateLayoutWithRotation(project: project) { proj in
+            self.generateLayoutInternal(project: proj, useStock: useStock)
         }
-
-        return generateLayoutInternal(project: project, useStock: useStock)
-    }
-
-    private func emptyResult() -> LayoutResult {
-        return LayoutResult(
-            placedPieces: [],
-            cutRecords: [],
-            remainingPieces: [],
-            purchaseSuggestions: [],
-            installedAreaM2: 0,
-            neededAreaM2: 0,
-            wasteAreaM2: 0,
-            surplusAreaM2: 0,
-            totalCost: 0
-        )
     }
 
     private func generateLayoutInternal(project: Project, useStock: Bool) -> LayoutResult {
@@ -64,7 +31,7 @@ class LaminateEngine: LayoutEngine {
         var availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)] = []
         
         if useStock && !project.stockItems.isEmpty {
-            for item in project.stockItems where item.widthMm == primaryWidth {
+            for item in project.stockItems where abs(item.widthMm - primaryWidth) < Constants.geometryToleranceMm {
                 for _ in 0..<item.quantity {
                     availablePieces.append((item.lengthMm, item.widthMm, .stock, item.pricePerUnit))
                 }
@@ -78,9 +45,10 @@ class LaminateEngine: LayoutEngine {
         var cutRecords: [CutRecord] = []
         var offcuts: [(length: Double, width: Double)] = []
         var usedStockCost = 0.0
-        var rowIndex = 0
         
         // Determine row direction
+        // If along length: rows run parallel to Length, so we stack them along Width
+        // If along width: rows run parallel to Width, so we stack them along Length
         let (rowLength, rowCount) = settings.plankDirection == .alongLength
             ? (usableLength, Int(ceil(usableWidth / primaryWidth)))
             : (usableWidth, Int(ceil(usableLength / primaryWidth)))
@@ -126,8 +94,6 @@ class LaminateEngine: LayoutEngine {
                 
                 while currentX < segEnd {
                     // Determine target length for this piece based on pattern alignment
-                    // Pattern aligns to rowStartOffset relative to 0
-
                     let k = floor((currentX - rowStartOffset) / settings.defaultPlankLengthMm) + 1
                     let nextJointX = rowStartOffset + k * settings.defaultPlankLengthMm
 
@@ -135,16 +101,12 @@ class LaminateEngine: LayoutEngine {
                     let distToEnd = segEnd - currentX
 
                     let targetLength = min(distToJoint, distToEnd)
-                    if targetLength < 1.0 {
-                        currentX += 1.0
+                    if targetLength < Constants.snapToleranceMm {
+                        currentX += Constants.snapToleranceMm
                         continue
                     }
 
                     // Try to find a piece that fits targetLength
-                    // We need a piece of at least targetLength.
-                    // If we use stock (typically defaultPlankLength), we cut it down.
-                    // If we use offcut, it must be >= targetLength.
-
                     var pieceIndex = -1
                     var selectedPiece: (length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)?
 
@@ -199,17 +161,14 @@ class LaminateEngine: LayoutEngine {
                     }
 
                     // Cut logic
-                    // We have 'piece' of length 'piece.length'. We need 'targetLength'.
-                    // Cut piece to targetLength. Remainder is offcut.
-
                     var cutType: CutRecord.LaminateCutType? = nil
-                    if abs(currentX - segStart) < 1.0 {
+                    if abs(currentX - segStart) < Constants.geometryToleranceMm {
                         cutType = .startCut
-                    } else if abs(currentX + targetLength - segEnd) < 1.0 {
+                    } else if abs(currentX + targetLength - segEnd) < Constants.geometryToleranceMm {
                         cutType = .endCut
                     }
 
-                    if piece.length > targetLength + 1.0 { // Tolerance
+                    if piece.length > targetLength + Constants.snapToleranceMm { // Tolerance
                         let offcutLength = piece.length - targetLength
                         if offcutLength >= settings.minOffcutLengthMm {
                             offcuts.append((offcutLength, piece.width))
@@ -218,7 +177,7 @@ class LaminateEngine: LayoutEngine {
                         cutRecords.append(CutRecord(
                             materialType: .laminate,
                             row: row,
-                            cutType: cutType ?? .endCut, // Middle cuts are rare unless using long stock? Usually we cut to fit joint or wall.
+                            cutType: cutType ?? .endCut,
                             fromLengthMm: piece.length,
                             cutToMm: targetLength,
                             offcutLengthMm: offcutLength,
@@ -244,7 +203,6 @@ class LaminateEngine: LayoutEngine {
             }
             
             currentY += primaryWidth
-            rowIndex += 1
         }
         
         // Build remaining pieces list
@@ -359,12 +317,9 @@ class LaminateEngine: LayoutEngine {
 
             // Check edge intersection with y = roomY
             // Handle horizontal edges: skip them (they don't cross scanline, they ARE scanline)
-            // But if scanline is exactly on edge, we might have issues.
-            // Standard ray casting rule: (p1.y <= Y < p2.y) or (p2.y <= Y < p1.y)
             if (p1.y <= roomY && p2.y > roomY) || (p2.y <= roomY && p1.y > roomY) {
                 // Calculate x
                 // x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-                // Avoid division by zero (guaranteed by condition p1.y != p2.y)
                 let t = (roomY - p1.y) / (p2.y - p1.y)
                 let x = p1.x + t * (p2.x - p1.x)
                 intersections.append(x)
@@ -385,7 +340,6 @@ class LaminateEngine: LayoutEngine {
             let layoutEnd = end - minX - room.expansionGapMm
 
             // Clip to bounding box just in case
-            // Bounding box for usable area is 0 to usableLength
             let validStart = max(0, layoutStart)
             let validEnd = min(room.usableLengthMm, layoutEnd)
 
@@ -394,13 +348,6 @@ class LaminateEngine: LayoutEngine {
             }
             i += 2
         }
-
-        // Fallback if no intersections found but we are within Y bounds of the polygon?
-        // If scanline misses (e.g. gap), segments is empty. Correct.
-        // If rectangular mode fell through (shouldn't happen), return bounds.
-
-        // If segments is empty but we expect something?
-        // For polygon, if we are outside the polygon, segments is empty. Correct.
 
         return segments
     }

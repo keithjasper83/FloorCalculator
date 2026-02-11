@@ -14,6 +14,54 @@ protocol LayoutEngine {
     ) -> LayoutResult
 }
 
+// MARK: - Layout Engine Extension
+
+extension LayoutEngine {
+    /// Returns an empty layout result
+    func emptyResult() -> LayoutResult {
+        return LayoutResult(
+            placedPieces: [],
+            cutRecords: [],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+    }
+
+    /// Handles rotation for diagonal layouts by transforming the room, running the closure, and transforming back
+    func generateLayoutWithRotation(
+        project: Project,
+        performLayout: (Project) -> LayoutResult
+    ) -> LayoutResult {
+        // Check for diagonal pattern
+        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > Constants.geometryToleranceMm {
+            let transform = LayoutTransform(room: project.roomSettings, angleDegrees: project.roomSettings.angleDegrees)
+            let rotatedRoom = transform.rotatedRoom(from: project.roomSettings)
+
+            var rotatedProject = project
+            rotatedProject.roomSettings = rotatedRoom
+            // Ensure pattern type is straight for the internal engine
+            rotatedProject.roomSettings.patternType = .straight
+            rotatedProject.roomSettings.angleDegrees = 0
+
+            let result = performLayout(rotatedProject)
+
+            // Transform pieces back
+            let transformedPieces = result.placedPieces.map { transform.transformBack($0) }
+
+            var finalResult = result
+            finalResult.placedPieces = transformedPieces
+            return finalResult
+        }
+
+        return performLayout(project)
+    }
+}
+
 // MARK: - Common Layout Utilities
 
 struct LayoutUtilities {

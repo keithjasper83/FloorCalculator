@@ -10,28 +10,9 @@ import Foundation
 class TileEngine: LayoutEngine {
     
     func generateLayout(project: Project, useStock: Bool) -> LayoutResult {
-        // Check for diagonal pattern
-        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > 0.1 {
-            let transform = LayoutTransform(room: project.roomSettings, angleDegrees: project.roomSettings.angleDegrees)
-            let rotatedRoom = transform.rotatedRoom(from: project.roomSettings)
-
-            var rotatedProject = project
-            rotatedProject.roomSettings = rotatedRoom
-            // Ensure pattern type is straight for the internal engine
-            rotatedProject.roomSettings.patternType = .straight
-            rotatedProject.roomSettings.angleDegrees = 0
-
-            let result = generateLayoutInternal(project: rotatedProject, useStock: useStock)
-
-            // Transform pieces back
-            let transformedPieces = result.placedPieces.map { transform.transformBack($0) }
-
-            var finalResult = result
-            finalResult.placedPieces = transformedPieces
-            return finalResult
+        return generateLayoutWithRotation(project: project) { proj in
+            self.generateLayoutInternal(project: proj, useStock: useStock)
         }
-
-        return generateLayoutInternal(project: project, useStock: useStock)
     }
 
     private func generateLayoutInternal(project: Project, useStock: Bool) -> LayoutResult {
@@ -47,7 +28,6 @@ class TileEngine: LayoutEngine {
         // Calculate grid dimensions
         let tilesAlongLength = Int(ceil(usableLength / tileSize))
         let tilesAlongWidth = Int(ceil(usableWidth / tileSize))
-        let totalTilesNeeded = tilesAlongLength * tilesAlongWidth
         
         // Count available stock and track prices
         var availableFullTiles = 0
@@ -56,7 +36,7 @@ class TileEngine: LayoutEngine {
         if useStock && !project.stockItems.isEmpty {
             for item in project.stockItems {
                 // Only count items that match tile size
-                if abs(item.lengthMm - tileSize) < 1.0 && abs(item.widthMm - tileSize) < 1.0 {
+                if abs(item.lengthMm - tileSize) < Constants.geometryToleranceMm && abs(item.widthMm - tileSize) < Constants.geometryToleranceMm {
                     availableFullTiles += item.quantity
                     // Add price for each individual tile
                     for _ in 0..<item.quantity {
@@ -64,8 +44,6 @@ class TileEngine: LayoutEngine {
                     }
                 }
             }
-            // Sort cheaper tiles first? Or consistent order.
-            // Let's assume user wants to use stock regardless of price, but tracking cheapest first is a valid optimization.
             availablePrices.sort()
         }
         
@@ -111,7 +89,7 @@ class TileEngine: LayoutEngine {
                 let placedWidth = endY - startY
 
                 // Skip if tile is effectively outside usable bounds
-                if placedLength < 0.1 || placedWidth < 0.1 { continue }
+                if placedLength < Constants.geometryToleranceMm || placedWidth < Constants.geometryToleranceMm { continue }
 
                 // Check if inside room polygon (using center of the visible piece)
                 let centerX = startX + placedLength / 2
@@ -131,7 +109,7 @@ class TileEngine: LayoutEngine {
                     rotation = ((row + col) % 2 == 0) ? 0.0 : 90.0
                 }
                 
-                let isFullTile = (placedLength >= tileSize - 0.1) && (placedWidth >= tileSize - 0.1)
+                let isFullTile = (placedLength >= tileSize - Constants.geometryToleranceMm) && (placedWidth >= tileSize - Constants.geometryToleranceMm)
                 let isCutTile = !isFullTile
                 
                 // Determine if this tile comes from stock or is needed
@@ -204,9 +182,6 @@ class TileEngine: LayoutEngine {
             }
         }
         
-        // If reuse edge offcuts is enabled, calculate saved offcuts
-        // (simplified - not fully implemented in v1)
-        
         // Calculate areas
         let installedAreaM2 = LayoutUtilities.calculateInstalledArea(pieces: placedPieces)
         let neededAreaM2 = LayoutUtilities.calculateNeededArea(pieces: placedPieces)
@@ -259,20 +234,6 @@ class TileEngine: LayoutEngine {
             wasteAreaM2: wasteAreaM2,
             surplusAreaM2: surplusAreaM2,
             totalCost: usedStockCost + purchaseCost
-        )
-    }
-    
-    private func emptyResult() -> LayoutResult {
-        return LayoutResult(
-            placedPieces: [],
-            cutRecords: [],
-            remainingPieces: [],
-            purchaseSuggestions: [],
-            installedAreaM2: 0,
-            neededAreaM2: 0,
-            wasteAreaM2: 0,
-            surplusAreaM2: 0,
-            totalCost: 0
         )
     }
 }
