@@ -23,6 +23,14 @@ enum UIKeyboardType {
     case asciiCapableNumberPad
 }
 
+enum NavigationBarItem {
+    enum TitleDisplayMode {
+        case automatic
+        case inline
+        case large
+    }
+}
+
 extension View {
     func keyboardType(_ type: UIKeyboardType) -> some View {
         self
