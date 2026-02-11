@@ -73,7 +73,7 @@ class PersistenceManager: ObservableObject {
         
         try context.performAndWait {
             // Check if project exists
-            let fetchRequest: NSFetchRequest<ProjectEntity> = ProjectEntity.fetchRequest()
+            let fetchRequest = NSFetchRequest<ProjectEntity>(entityName: "ProjectEntity")
             fetchRequest.predicate = NSPredicate(format: "id == %@", project.id as CVarArg)
 
             let results = try context.fetch(fetchRequest)
@@ -118,7 +118,7 @@ class PersistenceManager: ObservableObject {
         var projects: [Project] = []
         
         try context.performAndWait {
-            let fetchRequest: NSFetchRequest<ProjectEntity> = ProjectEntity.fetchRequest()
+            let fetchRequest = NSFetchRequest<ProjectEntity>(entityName: "ProjectEntity")
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "modifiedAt", ascending: false)]
 
             let entities = try context.fetch(fetchRequest)
@@ -133,7 +133,7 @@ class PersistenceManager: ObservableObject {
         var project: Project?
 
         try context.performAndWait {
-            let fetchRequest: NSFetchRequest<ProjectEntity> = ProjectEntity.fetchRequest()
+            let fetchRequest = NSFetchRequest<ProjectEntity>(entityName: "ProjectEntity")
             fetchRequest.predicate = NSPredicate(format: "id == %@", id as CVarArg)
 
             if let entity = try context.fetch(fetchRequest).first {
@@ -148,7 +148,7 @@ class PersistenceManager: ObservableObject {
         let context = stack.viewContext
 
         try context.performAndWait {
-            let fetchRequest: NSFetchRequest<ProjectEntity> = ProjectEntity.fetchRequest()
+            let fetchRequest = NSFetchRequest<ProjectEntity>(entityName: "ProjectEntity")
             fetchRequest.predicate = NSPredicate(format: "id == %@", project.id as CVarArg)
 
             if let entity = try context.fetch(fetchRequest).first {
@@ -203,7 +203,7 @@ class PersistenceManager: ObservableObject {
         let pattern = InstallationPattern(rawValue: entity.patternType ?? "Straight") ?? .straight
 
         var points: [RoomPoint] = []
-        if let pointEntities = entity.polygonPoints?.array as? [RoomPointEntity] {
+        if let pointEntities = entity.polygonPoints?.allObjects as? [RoomPointEntity] {
             // Assuming ordered set preserves order, or sort by orderIndex
             let sortedPoints = pointEntities.sorted { $0.orderIndex < $1.orderIndex }
             points = sortedPoints.map { RoomPoint(x: $0.x, y: $0.y) }
