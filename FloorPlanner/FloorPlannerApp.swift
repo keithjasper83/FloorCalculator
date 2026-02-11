@@ -58,7 +58,10 @@ class AppState: ObservableObject {
             engine = LaminateEngine()
         case .carpetTile, .ceramicTile:
             engine = TileEngine()
-        case .concrete, .paint, .plasterboard:
+        case .plasterboard:
+            // Plasterboard is discrete (sheets), use TileEngine for sheet-based layout
+            engine = TileEngine()
+        case .concrete, .paint:
             // For continuous materials, we use CalculatedEngine
             // We need to pass the material definition.
             // Since we are using legacy materialType switch, we can map it back.

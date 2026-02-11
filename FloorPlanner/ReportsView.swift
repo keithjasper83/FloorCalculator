@@ -22,13 +22,13 @@ struct ReportsView: View {
                             reportRow("Usable Area", value: "\(appState.currentProject.roomSettings.usableAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             reportRow("Installed Coverage", value: "\(result.installedAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
-                            if result.neededAreaM2 > Constants.geometryToleranceMm {
+                            if result.neededAreaM2 > Constants.areaToleranceM2 {
                                 reportRow("Needed Coverage", value: "\(result.neededAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .red)
                             }
                             
                             reportRow("Waste Area", value: "\(result.wasteAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
-                            if result.surplusAreaM2 > Constants.geometryToleranceMm {
+                            if result.surplusAreaM2 > Constants.areaToleranceM2 {
                                 reportRow("Surplus", value: "\(result.surplusAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .green)
                             }
                             
@@ -62,7 +62,8 @@ struct ReportsView: View {
 
                                         // Show Quantity (Integer or Double based on type)
                                         if appState.currentProject.materialType.toDomainMaterial.calculationType == .continuous {
-                                             Text("Quantity: \(suggestion.quantityValue.formatted(.number.precision(.fractionLength(2)))) units")
+                                             let unitName = suggestion.unitName ?? "units"
+                                             Text("Quantity: \(suggestion.quantityValue.formatted(.number.precision(.fractionLength(2)))) \(unitName)")
                                         } else {
                                              Text("Quantity: \(suggestion.quantityNeeded)")
                                         }
@@ -73,7 +74,7 @@ struct ReportsView: View {
                                         }
 
                                         if let cost = suggestion.estimatedCost {
-                                            Text("Est. Cost: \(appState.currentProject.currency) \(cost.formatted(.currency(code: appState.currentProject.currency)))")
+                                            Text("Est. Cost: \(cost.formatted(.currency(code: appState.currentProject.currency)))")
                                                 .foregroundColor(.secondary)
                                         }
                                     }

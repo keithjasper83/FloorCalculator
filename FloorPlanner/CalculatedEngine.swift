@@ -54,18 +54,15 @@ class CalculatedEngine: LayoutEngine {
         }
 
         // Generate Suggestion
-        // For continuous materials, we don't have "packs" usually, but maybe "buckets"
-        // For now, simple quantity
         let suggestion = PurchaseSuggestion(
             id: UUID(),
             unitLengthMm: 0,
             unitWidthMm: 0,
-            quantityNeeded: Int(ceil(quantityNeeded)), // Integer quantity for now (e.g. buckets), but continuous might need Double
+            quantityValue: quantityNeeded,
             packsNeeded: nil,
-            estimatedCost: estimatedCost
+            estimatedCost: estimatedCost,
+            unitName: unitName
         )
-        // Note: PurchaseSuggestion uses Int for quantity. For Volume, this is imprecise.
-        // We might need to refactor PurchaseSuggestion to support Double quantity or just store rounded up integer.
 
         return LayoutResult(
             placedPieces: [], // No individual pieces for continuous

@@ -93,6 +93,33 @@ struct Material: Codable, Identifiable, Equatable {
         defaultThicknessMm: 5.0
     )
 
+    static let vinylPlank = Material(
+        name: Constants.MaterialNames.vinylPlank,
+        category: .flooring,
+        calculationType: .discrete,
+        defaultLengthMm: Constants.Defaults.laminatePlankLengthMm,
+        defaultWidthMm: Constants.Defaults.laminatePlankWidthMm,
+        defaultThicknessMm: 5.0
+    )
+
+    static let engineeredWood = Material(
+        name: Constants.MaterialNames.engineeredWood,
+        category: .flooring,
+        calculationType: .discrete,
+        defaultLengthMm: Constants.Defaults.laminatePlankLengthMm,
+        defaultWidthMm: Constants.Defaults.laminatePlankWidthMm,
+        defaultThicknessMm: 15.0
+    )
+
+    static let ceramicTile = Material(
+        name: Constants.MaterialNames.ceramicTile,
+        category: .flooring,
+        calculationType: .discrete,
+        defaultLengthMm: Constants.Defaults.tileSizeMm,
+        defaultWidthMm: Constants.Defaults.tileSizeMm,
+        defaultThicknessMm: 8.0
+    )
+
     static let concrete = Material(
         name: Constants.MaterialNames.concrete,
         category: .structural,

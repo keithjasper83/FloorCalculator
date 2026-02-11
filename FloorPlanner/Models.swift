@@ -24,10 +24,12 @@ enum MaterialType: String, Codable, CaseIterable {
         switch self {
         case .laminate: return .laminate
         case .carpetTile: return .carpetTile
+        case .vinylPlank: return .vinylPlank
+        case .engineeredWood: return .engineeredWood
+        case .ceramicTile: return .ceramicTile
         case .concrete: return .concrete
         case .paint: return .paint
         case .plasterboard: return .plasterboard
-        default: return .laminate // Fallback
         }
     }
 }
@@ -353,28 +355,31 @@ struct PurchaseSuggestion: Codable, Equatable, Identifiable {
 
     var packsNeeded: Int?
     var estimatedCost: Double?
+    var unitName: String? // Unit name for continuous materials (e.g., "Liter", "m³")
     
     var totalAreaM2: Double {
         (unitLengthMm * unitWidthMm * quantityValue) / 1_000_000
     }
 
-    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityNeeded: Int, packsNeeded: Int? = nil, estimatedCost: Double? = nil) {
+    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityNeeded: Int, packsNeeded: Int? = nil, estimatedCost: Double? = nil, unitName: String? = nil) {
         self.id = id
         self.unitLengthMm = unitLengthMm
         self.unitWidthMm = unitWidthMm
         self.quantityValue = Double(quantityNeeded)
         self.packsNeeded = packsNeeded
         self.estimatedCost = estimatedCost
+        self.unitName = unitName
     }
 
     // New init for Double quantity
-    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityValue: Double, packsNeeded: Int? = nil, estimatedCost: Double? = nil) {
+    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityValue: Double, packsNeeded: Int? = nil, estimatedCost: Double? = nil, unitName: String? = nil) {
         self.id = id
         self.unitLengthMm = unitLengthMm
         self.unitWidthMm = unitWidthMm
         self.quantityValue = quantityValue
         self.packsNeeded = packsNeeded
         self.estimatedCost = estimatedCost
+        self.unitName = unitName
     }
 }
 
@@ -394,7 +399,7 @@ struct LayoutResult: Codable, Equatable {
     var totalCost: Double
 
     var isComplete: Bool {
-        neededAreaM2 <= Constants.geometryToleranceMm
+        neededAreaM2 <= Constants.areaToleranceM2
     }
 }
 

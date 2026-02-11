@@ -16,6 +16,12 @@ struct Constants {
     /// Slightly larger tolerance for snapping/alignment (mm)
     static let snapToleranceMm: Double = 1.0
 
+    /// Tolerance for angle comparisons (degrees)
+    static let angleToleranceDegrees: Double = 0.1
+
+    /// Tolerance for area comparisons (m²)
+    static let areaToleranceM2: Double = 0.0001
+
     // MARK: - Defaults
 
     struct Defaults {
