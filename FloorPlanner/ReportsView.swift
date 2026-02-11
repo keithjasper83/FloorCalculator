@@ -22,13 +22,13 @@ struct ReportsView: View {
                             reportRow("Usable Area", value: "\(appState.currentProject.roomSettings.usableAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             reportRow("Installed Coverage", value: "\(result.installedAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
-                            if result.neededAreaM2 > 0.01 {
+                            if result.neededAreaM2 > Constants.areaToleranceM2 {
                                 reportRow("Needed Coverage", value: "\(result.neededAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .red)
                             }
                             
                             reportRow("Waste Area", value: "\(result.wasteAreaM2.formatted(.number.precision(.fractionLength(2)))) m²")
                             
-                            if result.surplusAreaM2 > 0.01 {
+                            if result.surplusAreaM2 > Constants.areaToleranceM2 {
                                 reportRow("Surplus", value: "\(result.surplusAreaM2.formatted(.number.precision(.fractionLength(2)))) m²", color: .green)
                             }
                             
@@ -52,86 +52,108 @@ struct ReportsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(result.purchaseSuggestions) { suggestion in
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("\(Int(suggestion.unitLengthMm)) × \(Int(suggestion.unitWidthMm)) mm")
-                                            .font(.headline)
-                                        Text("Quantity: \(suggestion.quantityNeeded)")
+                                        if suggestion.unitLengthMm > 0 && suggestion.unitWidthMm > 0 {
+                                            Text("\(Int(suggestion.unitLengthMm)) × \(Int(suggestion.unitWidthMm)) mm")
+                                                .font(.headline)
+                                        } else {
+                                            Text("Calculated Material")
+                                                .font(.headline)
+                                        }
+
+                                        // Show Quantity (Integer or Double based on type)
+                                        if appState.currentProject.materialType.toDomainMaterial.calculationType == .continuous {
+                                             let unitName = suggestion.unitName ?? "units"
+                                             Text("Quantity: \(suggestion.quantityValue.formatted(.number.precision(.fractionLength(2)))) \(unitName)")
+                                        } else {
+                                             Text("Quantity: \(suggestion.quantityNeeded)")
+                                        }
+
                                         if let packs = suggestion.packsNeeded {
                                             Text("Packs/Boxes: \(packs)")
                                                 .foregroundColor(.secondary)
                                         }
+
+                                        if let cost = suggestion.estimatedCost {
+                                            Text("Est. Cost: \(cost.formatted(.currency(code: appState.currentProject.currency)))")
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                     .padding(.vertical, 4)
+                                    Divider()
                                 }
                             }
                         }
                     }
                     
-                    // Cut List
-                    if !result.cutRecords.isEmpty {
-                        GroupBox("Cut List") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                if appState.currentProject.materialType == .laminate {
-                                    ForEach(result.cutRecords) { cut in
-                                        if let row = cut.row, let cutType = cut.cutType {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Row \(row + 1): \(cutType.rawValue)")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.medium)
-                                                if let from = cut.fromLengthMm, let to = cut.cutToMm {
-                                                    Text("\(Int(from))mm → \(Int(to))mm")
+                    // Sections for Discrete Materials Only
+                    if appState.currentProject.materialType.toDomainMaterial.calculationType == .discrete {
+                        // Cut List
+                        if !result.cutRecords.isEmpty {
+                            GroupBox("Cut List") {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    if appState.currentProject.materialType == .laminate {
+                                        ForEach(result.cutRecords) { cut in
+                                            if let row = cut.row, let cutType = cut.cutType {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text("Row \(row + 1): \(cutType.rawValue)")
+                                                        .font(.subheadline)
+                                                        .fontWeight(.medium)
+                                                    if let from = cut.fromLengthMm, let to = cut.cutToMm {
+                                                        Text("\(Int(from))mm → \(Int(to))mm")
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondary)
+                                                    }
+                                                }
+                                                .padding(.vertical, 2)
+                                            }
+                                        }
+                                    } else {
+                                        ForEach(result.cutRecords) { cut in
+                                            if let edgeCount = cut.edgeCutCount {
+                                                Text("Edge Cuts: \(edgeCount)")
+                                                if let dims = cut.cutDimensionsMm {
+                                                    Text(dims)
                                                         .font(.caption)
                                                         .foregroundColor(.secondary)
                                                 }
                                             }
-                                            .padding(.vertical, 2)
-                                        }
-                                    }
-                                } else {
-                                    ForEach(result.cutRecords) { cut in
-                                        if let edgeCount = cut.edgeCutCount {
-                                            Text("Edge Cuts: \(edgeCount)")
-                                            if let dims = cut.cutDimensionsMm {
-                                                Text(dims)
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    
-                    // Remaining Inventory
-                    if !result.remainingPieces.isEmpty {
-                        GroupBox("Remaining Inventory") {
+
+                        // Remaining Inventory
+                        if !result.remainingPieces.isEmpty {
+                            GroupBox("Remaining Inventory") {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(result.remainingPieces) { piece in
+                                        HStack {
+                                            Text("\(Int(piece.lengthMm)) × \(Int(piece.widthMm)) mm")
+                                            Spacer()
+                                            Text(piece.source.rawValue)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Placement Statistics
+                        GroupBox("Placement Statistics") {
                             VStack(alignment: .leading, spacing: 8) {
-                                ForEach(result.remainingPieces) { piece in
-                                    HStack {
-                                        Text("\(Int(piece.lengthMm)) × \(Int(piece.widthMm)) mm")
-                                        Spacer()
-                                        Text(piece.source.rawValue)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                let installedCount = result.placedPieces.filter { $0.status == .installed }.count
+                                let neededCount = result.placedPieces.filter { $0.status == .needed }.count
+
+                                reportRow("Pieces Installed", value: "\(installedCount)")
+                                if neededCount > 0 {
+                                    reportRow("Pieces Needed", value: "\(neededCount)", color: .red)
                                 }
+                                reportRow("Total Pieces", value: "\(result.placedPieces.count)")
                             }
                         }
-                    }
-                    
-                    // Placement Statistics
-                    GroupBox("Placement Statistics") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            let installedCount = result.placedPieces.filter { $0.status == .installed }.count
-                            let neededCount = result.placedPieces.filter { $0.status == .needed }.count
-                            
-                            reportRow("Pieces Installed", value: "\(installedCount)")
-                            if neededCount > 0 {
-                                reportRow("Pieces Needed", value: "\(neededCount)", color: .red)
-                            }
-                            reportRow("Total Pieces", value: "\(result.placedPieces.count)")
-                        }
-                    }
+                    } // End Discrete Only
                     
                     // Export buttons
                     VStack(spacing: 12) {

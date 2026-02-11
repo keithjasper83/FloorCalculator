@@ -92,6 +92,7 @@ class PersistenceManager: ObservableObject {
             entity.currency = project.currency
             entity.materialType = project.materialType.rawValue
             entity.wasteFactor = project.wasteFactor
+            entity.layerThicknessMm = project.layers.first?.thicknessMm ?? 0.0
             entity.modifiedAt = Date() // Update modified time on save
 
             // Update relationships
@@ -180,6 +181,11 @@ class PersistenceManager: ObservableObject {
         project.id = id
         project.createdAt = entity.createdAt ?? Date()
         project.modifiedAt = entity.modifiedAt ?? Date()
+
+        // Restore layer thickness if it was persisted (even if zero)
+        if !project.layers.isEmpty {
+            project.layers[0].thicknessMm = entity.layerThicknessMm
+        }
 
         if let laminateEntity = entity.laminateSettings {
             project.laminateSettings = convertLaminateSettings(laminateEntity)
@@ -495,6 +501,7 @@ public class ProjectEntity: NSManagedObject {
     @NSManaged public var materialType: String?
     @NSManaged public var wasteFactor: Double
     @NSManaged public var currency: String?
+    @NSManaged public var layerThicknessMm: Double // For first layer thickness
 
     @NSManaged public var roomSettings: RoomSettingsEntity?
     @NSManaged public var stockItems: NSSet?

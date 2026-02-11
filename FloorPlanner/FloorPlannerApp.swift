@@ -54,10 +54,23 @@ class AppState: ObservableObject {
         let engine: LayoutEngine
         
         switch currentProject.materialType {
-        case .laminate:
+        case .laminate, .vinylPlank, .engineeredWood:
             engine = LaminateEngine()
-        case .carpetTile:
+        case .carpetTile, .ceramicTile:
             engine = TileEngine()
+        case .plasterboard:
+            // Plasterboard is discrete (sheets), use TileEngine for sheet-based layout
+            engine = TileEngine()
+        case .concrete, .paint:
+            // For continuous materials, we use CalculatedEngine
+            // We need to pass the material definition.
+            // Since we are using legacy materialType switch, we can map it back.
+            let material = currentProject.materialType.toDomainMaterial
+
+            // Get thickness from the layer if available, or default
+            let thickness = currentProject.layers.first?.thicknessMm ?? material.defaultThicknessMm ?? 0.0
+
+            engine = CalculatedEngine(material: material, thicknessMm: thickness)
         }
         
         let useStock = !currentProject.stockItems.isEmpty
@@ -68,28 +81,8 @@ class AppState: ObservableObject {
         currentProject.materialType = newType
         currentProject.modifiedAt = Date()
         
-        // Initialize material-specific settings
-        if newType == .laminate {
-            if currentProject.laminateSettings == nil {
-                currentProject.laminateSettings = LaminateSettings(
-                    minStaggerMm: 200,
-                    minOffcutLengthMm: 150,
-                    plankDirection: .alongLength,
-                    defaultPlankLengthMm: 1000,
-                    defaultPlankWidthMm: 300
-                )
-            }
-        } else {
-            if currentProject.tileSettings == nil {
-                currentProject.tileSettings = TileSettings(
-                    tileSizeMm: 500,
-                    pattern: .straight,
-                    orientation: .monolithic,
-                    reuseEdgeOffcuts: false,
-                    tilesPerBox: nil
-                )
-            }
-        }
+        // Initialize material-specific settings if needed
+        // (Project.materialType setter handles layer creation)
         
         // Regenerate layout
         generateLayout()

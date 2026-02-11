@@ -12,6 +12,51 @@ import Foundation
 enum MaterialType: String, Codable, CaseIterable {
     case laminate = "Laminate Planks"
     case carpetTile = "Carpet Tiles"
+    case vinylPlank = "Vinyl Planks"
+    case engineeredWood = "Engineered Wood"
+    case ceramicTile = "Ceramic Tiles"
+    case concrete = "Concrete"
+    case paint = "Paint"
+    case plasterboard = "Plasterboard"
+
+    // Helper to convert to Domain Material
+    var toDomainMaterial: Material {
+        switch self {
+        case .laminate: return .laminate
+        case .carpetTile: return .carpetTile
+        case .vinylPlank:
+            // Custom definition for vinyl
+            return Material(
+                name: Constants.MaterialNames.vinylPlank,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 1200,
+                defaultWidthMm: 180,
+                defaultThicknessMm: 5.0
+            )
+        case .engineeredWood:
+            return Material(
+                name: Constants.MaterialNames.engineeredWood,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 1200,
+                defaultWidthMm: 150,
+                defaultThicknessMm: 14.0
+            )
+        case .ceramicTile:
+            return Material(
+                name: Constants.MaterialNames.ceramicTile,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 300,
+                defaultWidthMm: 300,
+                defaultThicknessMm: 8.0
+            )
+        case .concrete: return .concrete
+        case .paint: return .paint
+        case .plasterboard: return .plasterboard
+        }
+    }
 }
 
 // MARK: - Room Shape
@@ -325,12 +370,84 @@ struct PurchaseSuggestion: Codable, Equatable, Identifiable {
     var id = UUID()
     var unitLengthMm: Double
     var unitWidthMm: Double
-    var quantityNeeded: Int
+
+    // Support for both integer (items) and double (volume)
+    var quantityValue: Double
+
+    var quantityNeeded: Int {
+        return Int(ceil(quantityValue))
+    }
+
     var packsNeeded: Int?
     var estimatedCost: Double?
+    var unitName: String? // Unit name for continuous materials (e.g., "Liter", "m³")
     
     var totalAreaM2: Double {
-        (unitLengthMm * unitWidthMm * Double(quantityNeeded)) / 1_000_000
+        (unitLengthMm * unitWidthMm * quantityValue) / 1_000_000
+    }
+
+    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityNeeded: Int, packsNeeded: Int? = nil, estimatedCost: Double? = nil, unitName: String? = nil) {
+        self.id = id
+        self.unitLengthMm = unitLengthMm
+        self.unitWidthMm = unitWidthMm
+        self.quantityValue = Double(quantityNeeded)
+        self.packsNeeded = packsNeeded
+        self.estimatedCost = estimatedCost
+        self.unitName = unitName
+    }
+
+    // New init for Double quantity
+    init(id: UUID = UUID(), unitLengthMm: Double, unitWidthMm: Double, quantityValue: Double, packsNeeded: Int? = nil, estimatedCost: Double? = nil, unitName: String? = nil) {
+        self.id = id
+        self.unitLengthMm = unitLengthMm
+        self.unitWidthMm = unitWidthMm
+        self.quantityValue = quantityValue
+        self.packsNeeded = packsNeeded
+        self.estimatedCost = estimatedCost
+        self.unitName = unitName
+    }
+
+    // MARK: - Codable Migration
+
+    enum CodingKeys: String, CodingKey {
+        case id, unitLengthMm, unitWidthMm, packsNeeded, estimatedCost
+        case quantityValue
+        case quantityNeeded // Legacy key
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        unitLengthMm = try container.decode(Double.self, forKey: .unitLengthMm)
+        unitWidthMm = try container.decode(Double.self, forKey: .unitWidthMm)
+        packsNeeded = try container.decodeIfPresent(Int.self, forKey: .packsNeeded)
+        estimatedCost = try container.decodeIfPresent(Double.self, forKey: .estimatedCost)
+
+        // Migration logic:
+        // 1. Try to decode new 'quantityValue'
+        // 2. If missing, decode old 'quantityNeeded' and convert to Double
+        if let val = try container.decodeIfPresent(Double.self, forKey: .quantityValue) {
+            quantityValue = val
+        } else if let val = try container.decodeIfPresent(Int.self, forKey: .quantityNeeded) {
+            quantityValue = Double(val)
+        } else {
+            // Should not happen if data is valid, but provide safe fallback
+            quantityValue = 0.0
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(unitLengthMm, forKey: .unitLengthMm)
+        try container.encode(unitWidthMm, forKey: .unitWidthMm)
+        try container.encode(packsNeeded, forKey: .packsNeeded)
+        try container.encode(estimatedCost, forKey: .estimatedCost)
+
+        // Encode new value
+        try container.encode(quantityValue, forKey: .quantityValue)
+        // Encode legacy value for backward compatibility (optional, can be removed if strictly forward-only)
+        try container.encode(quantityNeeded, forKey: .quantityNeeded)
     }
 }
 
@@ -350,7 +467,7 @@ struct LayoutResult: Codable, Equatable {
     var totalCost: Double
 
     var isComplete: Bool {
-        neededAreaM2 <= 0.01 // tolerance
+        neededAreaM2 <= Constants.areaToleranceM2
     }
 }
 
@@ -360,17 +477,60 @@ struct Project: Codable, Equatable {
     var id = UUID()
     var name: String
     var currency: String // e.g., "USD", "EUR"
-    var materialType: MaterialType
     var roomSettings: RoomSettings
     var stockItems: [StockItem]
     var wasteFactor: Double // percentage, e.g., 7.0 for 7%
     
-    var laminateSettings: LaminateSettings?
-    var tileSettings: TileSettings?
+    // V2: Multiple Layers
+    var layers: [Layer]
     
     var createdAt: Date
     var modifiedAt: Date
     
+    // Backward Compatibility Wrappers
+
+    var materialType: MaterialType {
+        get {
+            // Infer from first layer
+            guard let firstLayer = layers.first else { return .laminate }
+            // Try to map Material name back to Type
+            if let type = MaterialType(rawValue: firstLayer.material.name) {
+                return type
+            }
+            return .laminate
+        }
+        set {
+            // Update first layer
+            if layers.isEmpty {
+                layers.append(Layer(material: newValue.toDomainMaterial))
+            } else {
+                var layer = layers[0]
+                layer.material = newValue.toDomainMaterial
+                // Preserve settings if applicable
+                layers[0] = layer
+            }
+            ensureSettingsExist(for: newValue)
+        }
+    }
+
+    var laminateSettings: LaminateSettings? {
+        get { layers.first?.laminateSettings }
+        set {
+            if !layers.isEmpty {
+                layers[0].laminateSettings = newValue
+            }
+        }
+    }
+
+    var tileSettings: TileSettings? {
+        get { layers.first?.tileSettings }
+        set {
+            if !layers.isEmpty {
+                layers[0].tileSettings = newValue
+            }
+        }
+    }
+
     init(
         name: String = "New Project",
         currency: String = "USD",
@@ -382,7 +542,6 @@ struct Project: Codable, Equatable {
         self.id = UUID()
         self.name = name
         self.currency = currency
-        self.materialType = materialType
         self.roomSettings = roomSettings
         self.stockItems = stockItems
         self.wasteFactor = wasteFactor
@@ -391,9 +550,18 @@ struct Project: Codable, Equatable {
         self.createdAt = now
         self.modifiedAt = now
         
-        // Initialize material-specific settings
-        if materialType == .laminate {
-            self.laminateSettings = LaminateSettings(
+        // Initialize layers with default material
+        self.layers = [Layer(material: materialType.toDomainMaterial)]
+
+        ensureSettingsExist(for: materialType)
+    }
+
+    private mutating func ensureSettingsExist(for type: MaterialType) {
+        let laminateTypes: [MaterialType] = [.laminate, .vinylPlank, .engineeredWood]
+        let tileTypes: [MaterialType] = [.carpetTile, .ceramicTile]
+
+        if laminateTypes.contains(type) && layers[0].laminateSettings == nil {
+            layers[0].laminateSettings = LaminateSettings(
                 minStaggerMm: 200,
                 minOffcutLengthMm: 150,
                 plankDirection: .alongLength,
@@ -401,8 +569,8 @@ struct Project: Codable, Equatable {
                 defaultPlankWidthMm: 300,
                 defaultPricePerPlank: nil
             )
-        } else {
-            self.tileSettings = TileSettings(
+        } else if tileTypes.contains(type) && layers[0].tileSettings == nil {
+            layers[0].tileSettings = TileSettings(
                 tileSizeMm: 500,
                 pattern: .straight,
                 orientation: .monolithic,
@@ -413,8 +581,64 @@ struct Project: Codable, Equatable {
         }
     }
     
+    // Custom CodingKeys to handle migration
+    enum CodingKeys: String, CodingKey {
+        case id, name, currency, roomSettings, stockItems, wasteFactor, createdAt, modifiedAt
+        case layers
+        // Legacy keys
+        case materialType, laminateSettings, tileSettings
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        currency = try container.decode(String.self, forKey: .currency)
+        roomSettings = try container.decode(RoomSettings.self, forKey: .roomSettings)
+        stockItems = try container.decode([StockItem].self, forKey: .stockItems)
+        wasteFactor = try container.decode(Double.self, forKey: .wasteFactor)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try container.decode(Date.self, forKey: .modifiedAt)
+
+        // Try to decode layers (V2)
+        if let decodedLayers = try? container.decode([Layer].self, forKey: .layers) {
+            layers = decodedLayers
+        } else {
+            // Migration: Decode legacy fields and build layer
+            let type = try container.decode(MaterialType.self, forKey: .materialType)
+            var layer = Layer(material: type.toDomainMaterial)
+
+            if let lamSettings = try? container.decode(LaminateSettings.self, forKey: .laminateSettings) {
+                layer.laminateSettings = lamSettings
+            }
+            if let tSettings = try? container.decode(TileSettings.self, forKey: .tileSettings) {
+                layer.tileSettings = tSettings
+            }
+            layers = [layer]
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(currency, forKey: .currency)
+        try container.encode(roomSettings, forKey: .roomSettings)
+        try container.encode(stockItems, forKey: .stockItems)
+        try container.encode(wasteFactor, forKey: .wasteFactor)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(modifiedAt, forKey: .modifiedAt)
+
+        try container.encode(layers, forKey: .layers)
+
+        // Encode legacy fields for backward compatibility (optional, but good for rolling back)
+        try container.encode(materialType, forKey: .materialType)
+        try container.encode(laminateSettings, forKey: .laminateSettings)
+        try container.encode(tileSettings, forKey: .tileSettings)
+    }
+
     static func sampleLaminateProject() -> Project {
-        var project = Project(
+        return Project(
             name: "Sample Laminate Project",
             materialType: .laminate,
             roomSettings: RoomSettings(lengthMm: 5000, widthMm: 4000, expansionGapMm: 10),
@@ -426,17 +650,15 @@ struct Project: Codable, Equatable {
             ],
             wasteFactor: 7.0
         )
-        return project
     }
     
     static func sampleTileProject() -> Project {
-        var project = Project(
+        return Project(
             name: "Sample Tile Project",
             materialType: .carpetTile,
             roomSettings: RoomSettings(lengthMm: 5000, widthMm: 4000, expansionGapMm: 10),
             stockItems: [],
             wasteFactor: 10.0
         )
-        return project
     }
 }

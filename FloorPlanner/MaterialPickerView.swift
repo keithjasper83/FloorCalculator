@@ -13,6 +13,16 @@ struct MaterialPickerView: View {
     @State private var selectedType: MaterialType
     @State private var showWarning = false
     
+    // Group materials by category for better UI
+    private var categories: [String: [MaterialType]] {
+        Dictionary(grouping: MaterialType.allCases) { type in
+            type.toDomainMaterial.category.rawValue
+        }
+    }
+
+    // Ordered category keys
+    private let categoryOrder: [MaterialCategory] = [.flooring, .wallCovering, .liquid, .structural]
+
     init() {
         _selectedType = State(initialValue: .laminate)
     }
@@ -24,17 +34,31 @@ struct MaterialPickerView: View {
                     .font(.title2)
                     .padding(.top)
                 
-                Text("Choose the type of flooring material you'll be working with.")
+                Text("Choose the material you'll be working with.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 
-                VStack(spacing: 12) {
-                    materialTypeButton(.laminate)
-                    materialTypeButton(.carpetTile)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        ForEach(categoryOrder, id: \.self) { category in
+                            if let types = categories[category.rawValue], !types.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(category.rawValue)
+                                        .font(.headline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 4)
+
+                                    ForEach(types, id: \.self) { type in
+                                        materialTypeButton(type)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding()
                 }
-                .padding()
                 
                 if !appState.isFirstLaunch {
                     Text("⚠️ Changing material type will regenerate the layout with new rules.")
@@ -88,11 +112,10 @@ struct MaterialPickerView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(type.rawValue)
-                        .font(.headline)
+                        .font(.body)
+                        .fontWeight(.medium)
                     
-                    Text(type == .laminate
-                         ? "Row-based layout with stagger rules"
-                         : "Grid-based layout with pattern options")
+                    Text(descriptionFor(type))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -102,6 +125,9 @@ struct MaterialPickerView: View {
                 if selectedType == type {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.accentColor)
+                } else {
+                    Image(systemName: "circle")
+                        .foregroundColor(.secondary.opacity(0.3))
                 }
             }
             .padding()
@@ -116,5 +142,20 @@ struct MaterialPickerView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func descriptionFor(_ type: MaterialType) -> String {
+        switch type {
+        case .laminate, .vinylPlank, .engineeredWood:
+            return "Row-based layout with stagger rules"
+        case .carpetTile, .ceramicTile:
+            return "Grid-based layout with pattern options"
+        case .concrete:
+            return "Volume calculation based on area & depth"
+        case .paint:
+            return "Coverage calculation based on area"
+        case .plasterboard:
+            return "Sheet calculation for surface area"
+        }
     }
 }
