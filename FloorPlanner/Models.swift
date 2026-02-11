@@ -24,10 +24,37 @@ enum MaterialType: String, Codable, CaseIterable {
         switch self {
         case .laminate: return .laminate
         case .carpetTile: return .carpetTile
+        case .vinylPlank:
+            // Custom definition for vinyl
+            return Material(
+                name: Constants.MaterialNames.vinylPlank,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 1200,
+                defaultWidthMm: 180,
+                defaultThicknessMm: 5.0
+            )
+        case .engineeredWood:
+            return Material(
+                name: Constants.MaterialNames.engineeredWood,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 1200,
+                defaultWidthMm: 150,
+                defaultThicknessMm: 14.0
+            )
+        case .ceramicTile:
+            return Material(
+                name: Constants.MaterialNames.ceramicTile,
+                category: .flooring,
+                calculationType: .discrete,
+                defaultLengthMm: 300,
+                defaultWidthMm: 300,
+                defaultThicknessMm: 8.0
+            )
         case .concrete: return .concrete
         case .paint: return .paint
         case .plasterboard: return .plasterboard
-        default: return .laminate // Fallback
         }
     }
 }
@@ -376,6 +403,49 @@ struct PurchaseSuggestion: Codable, Equatable, Identifiable {
         self.packsNeeded = packsNeeded
         self.estimatedCost = estimatedCost
     }
+
+    // MARK: - Codable Migration
+
+    enum CodingKeys: String, CodingKey {
+        case id, unitLengthMm, unitWidthMm, packsNeeded, estimatedCost
+        case quantityValue
+        case quantityNeeded // Legacy key
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        unitLengthMm = try container.decode(Double.self, forKey: .unitLengthMm)
+        unitWidthMm = try container.decode(Double.self, forKey: .unitWidthMm)
+        packsNeeded = try container.decodeIfPresent(Int.self, forKey: .packsNeeded)
+        estimatedCost = try container.decodeIfPresent(Double.self, forKey: .estimatedCost)
+
+        // Migration logic:
+        // 1. Try to decode new 'quantityValue'
+        // 2. If missing, decode old 'quantityNeeded' and convert to Double
+        if let val = try container.decodeIfPresent(Double.self, forKey: .quantityValue) {
+            quantityValue = val
+        } else if let val = try container.decodeIfPresent(Int.self, forKey: .quantityNeeded) {
+            quantityValue = Double(val)
+        } else {
+            // Should not happen if data is valid, but provide safe fallback
+            quantityValue = 0.0
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(unitLengthMm, forKey: .unitLengthMm)
+        try container.encode(unitWidthMm, forKey: .unitWidthMm)
+        try container.encode(packsNeeded, forKey: .packsNeeded)
+        try container.encode(estimatedCost, forKey: .estimatedCost)
+
+        // Encode new value
+        try container.encode(quantityValue, forKey: .quantityValue)
+        // Encode legacy value for backward compatibility (optional, can be removed if strictly forward-only)
+        try container.encode(quantityNeeded, forKey: .quantityNeeded)
+    }
 }
 
 // MARK: - Layout Result
@@ -394,7 +464,7 @@ struct LayoutResult: Codable, Equatable {
     var totalCost: Double
 
     var isComplete: Bool {
-        neededAreaM2 <= Constants.geometryToleranceMm
+        neededAreaM2 <= Constants.areaToleranceM2
     }
 }
 

@@ -38,7 +38,7 @@ extension LayoutEngine {
         performLayout: (Project) -> LayoutResult
     ) -> LayoutResult {
         // Check for diagonal pattern
-        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > Constants.geometryToleranceMm {
+        if project.roomSettings.patternType == .diagonal && abs(project.roomSettings.angleDegrees) > Constants.angleToleranceDegrees {
             let transform = LayoutTransform(room: project.roomSettings, angleDegrees: project.roomSettings.angleDegrees)
             let rotatedRoom = transform.rotatedRoom(from: project.roomSettings)
 

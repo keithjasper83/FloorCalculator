@@ -45,6 +45,14 @@ class CalculatedEngine: LayoutEngine {
                      unitName = "m³"
                  }
              }
+        } else if material.calculationType == .discrete && material.category == .wallCovering {
+             // Handle simple discrete sheet calculation (e.g. Plasterboard)
+             // Area / Sheet Area
+             if let len = material.defaultLengthMm, let wid = material.defaultWidthMm, len > 0, wid > 0 {
+                 let sheetAreaM2 = (len * wid) / 1_000_000.0
+                 quantityNeeded = areaM2 / sheetAreaM2
+                 unitName = "Sheets"
+             }
         }
 
         // Calculate Cost
@@ -54,21 +62,18 @@ class CalculatedEngine: LayoutEngine {
         }
 
         // Generate Suggestion
-        // For continuous materials, we don't have "packs" usually, but maybe "buckets"
-        // For now, simple quantity
+        // Use quantityValue (Double) to preserve fractional quantities; UI is responsible for any rounding/formatting.
         let suggestion = PurchaseSuggestion(
             id: UUID(),
             unitLengthMm: 0,
             unitWidthMm: 0,
-            quantityNeeded: Int(ceil(quantityNeeded)), // Integer quantity for now (e.g. buckets), but continuous might need Double
+            quantityValue: quantityNeeded,
             packsNeeded: nil,
             estimatedCost: estimatedCost
         )
-        // Note: PurchaseSuggestion uses Int for quantity. For Volume, this is imprecise.
-        // We might need to refactor PurchaseSuggestion to support Double quantity or just store rounded up integer.
 
         return LayoutResult(
-            placedPieces: [], // No individual pieces for continuous
+            placedPieces: [], // No individual pieces for continuous/calculated
             cutRecords: [],
             remainingPieces: [],
             purchaseSuggestions: [suggestion],
