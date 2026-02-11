@@ -69,7 +69,8 @@ class CalculatedEngine: LayoutEngine {
             unitWidthMm: 0,
             quantityValue: quantityNeeded,
             packsNeeded: nil,
-            estimatedCost: estimatedCost
+            estimatedCost: estimatedCost,
+            unitName: unitName
         )
 
         return LayoutResult(

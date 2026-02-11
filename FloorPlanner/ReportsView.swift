@@ -62,7 +62,8 @@ struct ReportsView: View {
 
                                         // Show Quantity (Integer or Double based on type)
                                         if appState.currentProject.materialType.toDomainMaterial.calculationType == .continuous {
-                                             Text("Quantity: \(suggestion.quantityValue.formatted(.number.precision(.fractionLength(2)))) units")
+                                             let unitName = suggestion.unitName ?? "units"
+                                             Text("Quantity: \(suggestion.quantityValue.formatted(.number.precision(.fractionLength(2)))) \(unitName)")
                                         } else {
                                              Text("Quantity: \(suggestion.quantityNeeded)")
                                         }
