@@ -204,14 +204,6 @@ struct LayoutTransform {
         return newPiece
     }
 }
-//
-//  CalculatedEngine.swift
-//  FloorPlanner
-//
-//  Engine for continuous materials like paint and concrete
-//
-
-
 class CalculatedEngine: LayoutEngine {
 
     // Properties to define the material being calculated

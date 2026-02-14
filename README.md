@@ -49,13 +49,10 @@ A universal SwiftUI app for planning and calculating floor installations. Now su
 
 ```
 FloorPlanner/
-├── Materials.swift              # Material, Layer, Surface definitions
-├── Constants.swift              # Shared constants
-├── Models.swift                 # Core data models (Project, RoomSettings)
-├── LayoutEngine.swift           # Layout engine protocol & utilities
+├── Models.swift                 # Core data models (Project, RoomSettings, Materials)
+├── LayoutEngine.swift           # Layout engine protocol & utilities (inc. CalculatedEngine)
 ├── LaminateEngine.swift         # Discrete plank layout
 ├── TileEngine.swift             # Discrete tile layout
-├── CalculatedEngine.swift       # Continuous material calculator
 ├── PersistenceManager.swift     # Save/load and export functionality
 ├── FloorPlannerApp.swift        # App entry point and state
 ├── ContentView.swift            # Main adaptive view

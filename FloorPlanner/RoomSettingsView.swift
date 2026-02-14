@@ -164,14 +164,6 @@ struct RoomSettingsView: View {
         #endif
     }
 }
-//
-//  ARCaptureView.swift
-//  FloorPlanner
-//
-//  AR Room Scanning using RoomPlan
-//
-
-
 struct ARCaptureView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var roomSettings: RoomSettings
@@ -307,14 +299,6 @@ struct RoomCaptureContainer: UIViewRepresentable {
     }
 }
 #endif
-//
-//  RoomDesignerView.swift
-//  FloorPlanner
-//
-//  CAD-style parametric room designer with line drawing tool
-//
-
-
 struct RoomDesignerView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
