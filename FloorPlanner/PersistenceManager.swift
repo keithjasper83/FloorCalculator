@@ -55,19 +55,13 @@ class PersistenceManager: ObservableObject {
                     decoder.dateDecodingStrategy = .iso8601
                     let project = try decoder.decode(Project.self, from: data)
 
-                    // Save to Core Data using background context
-                    try self.saveProject(project, in: backgroundContext)
-
-                    // Move legacy file to backup or delete
-                    // For safety, let's rename extension to .migrated
-                    let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
-                    try? FileManager.default.removeItem(at: destination) // Remove if exists
-                    try FileManager.default.moveItem(at: url, to: destination)
-
-                    print("Migrated project: \(project.name)")
-                } catch {
-                    print("Failed to migrate project at \(url): \(error)")
-                }
+                // Move legacy file to backup or delete
+                // For safety, let's rename extension to .migrated
+                let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
+                try? FileManager.default.removeItem(at: destination) // Remove if exists
+                try FileManager.default.moveItem(at: url, to: destination)
+            } catch {
+                // Silently fail or use a non-sensitive logging mechanism
             }
         }
     }
@@ -470,8 +464,8 @@ class CoreDataStack: ObservableObject {
         description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
 
         container.loadPersistentStores { description, error in
-            if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
+            if let _ = error {
+                // Core Data failed to load.
                 // In a real app we might want to handle this better (e.g., delete store and retry)
             }
         }
@@ -490,7 +484,7 @@ class CoreDataStack: ObservableObject {
             do {
                 try context.save()
             } catch {
-                print("Error saving Core Data context: \(error.localizedDescription)")
+                // Error saving Core Data context.
             }
         }
     }
