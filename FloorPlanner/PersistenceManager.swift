@@ -58,10 +58,8 @@ class PersistenceManager: ObservableObject {
                 let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
                 try? FileManager.default.removeItem(at: destination) // Remove if exists
                 try FileManager.default.moveItem(at: url, to: destination)
-
-                print("Migrated project: \(project.name)")
             } catch {
-                print("Failed to migrate project at \(url): \(error)")
+                // Silently fail or use a non-sensitive logging mechanism if needed in the future
             }
         }
     }
