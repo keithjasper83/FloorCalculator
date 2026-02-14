@@ -49,20 +49,22 @@ class PersistenceManager: ObservableObject {
             backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
             for url in jsonFiles {
-                do {
-                    let data = try Data(contentsOf: url)
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    let project = try decoder.decode(Project.self, from: data)
+                autoreleasepool {
+                    do {
+                        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                        let decoder = JSONDecoder()
+                        decoder.dateDecodingStrategy = .iso8601
+                        let project = try decoder.decode(Project.self, from: data)
 
-                // Move legacy file to backup or delete
-                // For safety, let's rename extension to .migrated
-                let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
-                try? FileManager.default.removeItem(at: destination) // Remove if exists
-                try FileManager.default.moveItem(at: url, to: destination)
-            } catch {
-                // Silently fail or use a non-sensitive logging mechanism
-            }
+                        // Move legacy file to backup or delete
+                        // For safety, let's rename extension to .migrated
+                        let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
+                        try? FileManager.default.removeItem(at: destination) // Remove if exists
+                        try FileManager.default.moveItem(at: url, to: destination)
+                    } catch {
+                        // Silently fail or use a non-sensitive logging mechanism
+                    }
+                }
         }
     }
     
