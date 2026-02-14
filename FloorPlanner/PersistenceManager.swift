@@ -59,7 +59,7 @@ class PersistenceManager: ObservableObject {
                 try? FileManager.default.removeItem(at: destination) // Remove if exists
                 try FileManager.default.moveItem(at: url, to: destination)
             } catch {
-                // Silently fail or use a non-sensitive logging mechanism if needed in the future
+                // Silently fail or use a non-sensitive logging mechanism
             }
         }
     }
@@ -462,8 +462,8 @@ class CoreDataStack: ObservableObject {
         description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
 
         container.loadPersistentStores { description, error in
-            if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
+            if let _ = error {
+                // Core Data failed to load.
                 // In a real app we might want to handle this better (e.g., delete store and retry)
             }
         }
@@ -482,7 +482,7 @@ class CoreDataStack: ObservableObject {
             do {
                 try context.save()
             } catch {
-                print("Error saving Core Data context: \(error.localizedDescription)")
+                // Error saving Core Data context.
             }
         }
     }
