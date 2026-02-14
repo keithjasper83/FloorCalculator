@@ -36,40 +36,46 @@ class PersistenceManager: ObservableObject {
     }
     
     private func migrateLegacyProjects() {
-        let projectsDir = getProjectsDirectory()
-        guard let urls = try? FileManager.default.contentsOfDirectory(at: projectsDir, includingPropertiesForKeys: nil) else {
-            return
-        }
+        DispatchQueue.global(qos: .utility).async {
+            let projectsDir = self.getProjectsDirectory()
+            guard let urls = try? FileManager.default.contentsOfDirectory(at: projectsDir, includingPropertiesForKeys: nil) else {
+                return
+            }
 
-        let jsonFiles = urls.filter { $0.pathExtension == "json" }
+            let jsonFiles = urls.filter { $0.pathExtension == "json" }
+            if jsonFiles.isEmpty { return }
 
-        for url in jsonFiles {
-            do {
-                let data = try Data(contentsOf: url)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let project = try decoder.decode(Project.self, from: data)
+            let backgroundContext = self.stack.container.newBackgroundContext()
+            backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
-                // Save to Core Data
-                try saveProject(project)
+            for url in jsonFiles {
+                do {
+                    let data = try Data(contentsOf: url)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let project = try decoder.decode(Project.self, from: data)
 
-                // Move legacy file to backup or delete
-                // For safety, let's rename extension to .migrated
-                let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
-                try? FileManager.default.removeItem(at: destination) // Remove if exists
-                try FileManager.default.moveItem(at: url, to: destination)
+                    // Save to Core Data using background context
+                    try self.saveProject(project, in: backgroundContext)
 
-                print("Migrated project: \(project.name)")
-            } catch {
-                print("Failed to migrate project at \(url): \(error)")
+                    // Move legacy file to backup or delete
+                    // For safety, let's rename extension to .migrated
+                    let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
+                    try? FileManager.default.removeItem(at: destination) // Remove if exists
+                    try FileManager.default.moveItem(at: url, to: destination)
+
+                    print("Migrated project: \(project.name)")
+                } catch {
+                    print("Failed to migrate project at \(url): \(error)")
+                }
             }
         }
     }
     
     // MARK: - Save & Load
     
-    func saveProject(_ project: Project) throws {
-        let context = stack.viewContext
+    func saveProject(_ project: Project, in context: NSManagedObjectContext? = nil) throws {
+        let context = context ?? stack.viewContext
         
         try context.performAndWait {
             // Check if project exists
