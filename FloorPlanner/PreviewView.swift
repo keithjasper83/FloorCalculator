@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PreviewView: View {
     @EnvironmentObject var appState: AppState
@@ -19,7 +20,15 @@ struct PreviewView: View {
                 ZStack {
                     // Canvas for drawing
                     Canvas { context, size in
-                        drawLayout(context: context, size: size, result: result)
+                        PreviewView.drawLayout(
+                            context: context,
+                            size: size,
+                            result: result,
+                            room: appState.currentProject.roomSettings,
+                            materialType: appState.currentProject.materialType,
+                            scale: scale,
+                            offset: offset
+                        )
                     }
                     .gesture(
                         MagnificationGesture()
@@ -44,7 +53,7 @@ struct PreviewView: View {
                     VStack {
                         Spacer()
                         HStack {
-                            legendView
+                            LayoutLegendView(materialType: appState.currentProject.materialType)
                             Spacer()
                         }
                         .padding()
@@ -82,9 +91,15 @@ struct PreviewView: View {
         .navigationTitle("Preview")
     }
     
-    private func drawLayout(context: GraphicsContext, size: CGSize, result: LayoutResult) {
-        let room = appState.currentProject.roomSettings
-        
+    static func drawLayout(
+        context: GraphicsContext,
+        size: CGSize,
+        result: LayoutResult,
+        room: RoomSettings,
+        materialType: MaterialType,
+        scale: CGFloat,
+        offset: CGSize
+    ) {
         // Calculate scale to fit
         let marginPx = 40.0
         let availableWidth = size.width - 2 * marginPx
@@ -215,7 +230,6 @@ struct PreviewView: View {
              // Continuous material fill
              // Fill the usable area (or room area if simple)
              // Determine color based on material type
-             let materialType = appState.currentProject.materialType
              var fillColor: Color = .gray.opacity(0.3)
 
              switch materialType {
@@ -246,9 +260,52 @@ struct PreviewView: View {
         }
     }
     
-    private var legendView: some View {
+    @MainActor
+    private func exportImage() {
+        guard let result = appState.layoutResult else { return }
+        let room = appState.currentProject.roomSettings
+        let materialType = appState.currentProject.materialType
+
+        // Calculate a good export size (max 2000px dimension)
+        let maxDimMm = max(room.boundingLengthMm, room.boundingWidthMm)
+        guard maxDimMm > 0 else { return }
+
+        let exportScale = 2000.0 / maxDimMm
+        let exportSize = CGSize(
+            width: room.boundingLengthMm * exportScale,
+            height: room.boundingWidthMm * exportScale
+        )
+
+        let exportView = ExportView(
+            result: result,
+            room: room,
+            materialType: materialType,
+            size: exportSize
+        )
+
+        let renderer = ImageRenderer(content: exportView)
+        renderer.scale = 2.0 // Use high DPI
+
+        #if os(macOS)
+        if let image = renderer.nsImage {
+            saveImageMacOS(image)
+        }
+        #else
+        if let image = renderer.uiImage {
+            shareImageIOS(image)
+        }
+        #endif
+    }
+}
+
+// MARK: - Components for Export
+
+struct LayoutLegendView: View {
+    let materialType: MaterialType
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if appState.currentProject.materialType.toDomainMaterial.calculationType == .discrete {
+            if materialType.toDomainMaterial.calculationType == .discrete {
                 HStack(spacing: 8) {
                     Rectangle()
                         .fill(Color.green.opacity(0.3))
@@ -300,9 +357,82 @@ struct PreviewView: View {
                 .fill(.regularMaterial)
         )
     }
+}
+
+struct ExportView: View {
+    let result: LayoutResult
+    let room: RoomSettings
+    let materialType: MaterialType
+    let size: CGSize
     
-    private func exportImage() {
-        // TODO: Implement export
-        print("Export image")
+    var body: some View {
+        ZStack {
+            Color.white // Solid background for export
+
+            Canvas { context, size in
+                PreviewView.drawLayout(
+                    context: context,
+                    size: size,
+                    result: result,
+                    room: room,
+                    materialType: materialType,
+                    scale: 1.0,
+                    offset: .zero
+                )
+            }
+
+            VStack {
+                Spacer()
+                HStack {
+                    LayoutLegendView(materialType: materialType)
+                        .padding()
+                    Spacer()
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
     }
 }
+
+// MARK: - Platform Specific Export Helpers
+
+#if os(macOS)
+extension PreviewView {
+    private func saveImageMacOS(_ image: NSImage) {
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.png]
+        savePanel.canCreateDirectories = true
+        savePanel.isExtensionHidden = false
+        savePanel.title = "Export Floor Plan"
+        savePanel.nameFieldStringValue = "FloorPlan.png"
+
+        if savePanel.runModal() == .OK {
+            if let url = savePanel.url {
+                if let tiffData = image.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiffData),
+                   let pngData = bitmap.representation(using: .png, properties: [:]) {
+                    try? pngData.write(to: url)
+                }
+            }
+        }
+    }
+}
+#else
+extension PreviewView {
+    private func shareImageIOS(_ image: UIImage) {
+        let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = rootVC.view
+                popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+
+            rootVC.present(activityVC, animated: true, completion: nil)
+        }
+    }
+}
+#endif
