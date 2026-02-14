@@ -36,7 +36,7 @@ This document summarizes the implementation of the parametric CAD-style room des
 - Existing projects load without modification
 - All existing code continues to work
 
-### 2. CAD-Style Designer View (RoomDesignerView.swift)
+### 2. CAD-Style Designer View (in RoomSettingsView.swift)
 
 **Core Features:**
 - SwiftUI Canvas-based drawing surface
@@ -217,7 +217,7 @@ let snappedY = round(y / gridSize) * gridSize
 ## Files Created/Modified
 
 ### Created (3 files, ~1,300 lines):
-1. **RoomDesignerView.swift** - CAD interface (400 lines)
+1. **RoomDesignerView** (consolidated in RoomSettingsView.swift) - CAD interface (400 lines)
 2. **PARAMETRIC_ROOM_GUIDE.md** - User guide (350 lines)
 3. **PARAMETRIC_UI_MOCKUP.md** - UI specifications (450 lines)
 4. **PARAMETRIC_IMPLEMENTATION_SUMMARY.md** - This file (100 lines)

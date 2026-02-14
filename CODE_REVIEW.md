@@ -16,7 +16,7 @@ This document summarizes the code review performed on the `FloorPlanner` project
     - **Engines**: Encapsulates the business logic for layout generation (`LayoutEngine` implementations).
     - **UI**: Handles presentation and user interaction (`Views`).
     - **State**: `AppState` manages the application state and coordination.
-- **Enhancement**: Introduced a robust `Material` system in `Materials.swift` to support future expansion (e.g., continuous materials like paint/concrete) without breaking the existing discrete material logic. The `Project` model was updated to support `layers`, paving the way for multi-layered surfaces.
+- **Enhancement**: Introduced a robust `Material` system in `Models.swift` to support future expansion (e.g., continuous materials like paint/concrete) without breaking the existing discrete material logic. The `Project` model was updated to support `layers`, paving the way for multi-layered surfaces.
 
 ### 3. Apple Standards & Swift Best Practices
 - **Style**: The code adheres to standard Swift naming conventions (CamelCase, descriptive names).
@@ -25,7 +25,7 @@ This document summarizes the code review performed on the `FloorPlanner` project
 - **Platform**: The UI code uses conditional compilation (`#if os(iOS)`) and adaptive layouts (`NavigationSplitView` vs `NavigationStack`) to ensure a great experience on both iOS and macOS.
 
 ### 4. Scalability
-- **New Feature**: Added `CalculatedEngine` to handle continuous materials. This demonstrates the extensibility of the `LayoutEngine` protocol.
+- **New Feature**: Added `CalculatedEngine` (in `LayoutEngine.swift`) to handle continuous materials. This demonstrates the extensibility of the `LayoutEngine` protocol.
 - **Data Model**: The migration to a layer-based system (`Project.layers`) ensures the app can grow to handle complex room compositions (e.g., subfloors, underlay, finish) in the future.
 
 ## Recommendations for Future Development

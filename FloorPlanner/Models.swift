@@ -663,14 +663,6 @@ struct Project: Codable, Equatable {
         )
     }
 }
-//
-//  Constants.swift
-//  FloorPlanner
-//
-//  Shared constants and magic numbers for the application
-//
-
-
 struct Constants {
     // MARK: - Geometry & Layout
 
@@ -716,14 +708,6 @@ struct Constants {
         static let plasterboard = "Plasterboard"
     }
 }
-//
-//  Materials.swift
-//  FloorPlanner
-//
-//  Domain model for materials, layers, and surfaces
-//
-
-
 // MARK: - Material Calculation Type
 
 /// Defines how the material quantity is calculated
