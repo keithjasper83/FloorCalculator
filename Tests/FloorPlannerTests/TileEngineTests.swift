@@ -122,4 +122,72 @@ final class TileEngineTests: XCTestCase {
             XCTAssertEqual(piece.rotation, expectedRotation, "Piece at (\(col), \(row)) has wrong rotation")
         }
     }
+
+    func testDoSProtection() {
+        // Test case where tile count exceeds limit (20,000)
+        // 100m x 100m room with 500mm tiles
+        // 100000 / 500 = 200 tiles along length
+        // 200 * 200 = 40,000 tiles
+
+        let tileSize = 500.0
+        let roomLength = 100000.0 // 100m
+        let roomWidth = 100000.0  // 100m
+
+        var project = Project(
+            name: "DoS Protection Test",
+            materialType: .carpetTile,
+            roomSettings: RoomSettings(lengthMm: roomLength, widthMm: roomWidth, expansionGapMm: 0),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+
+        let settings = TileSettings(
+            tileSizeMm: tileSize,
+            pattern: .straight,
+            orientation: .monolithic,
+            reuseEdgeOffcuts: false
+        )
+        project.tileSettings = settings
+
+        let engine = TileEngine()
+        let result = engine.generateLayout(project: project, useStock: false)
+
+        // Should return empty result to prevent DoS
+        XCTAssertTrue(result.placedPieces.isEmpty, "Should abort layout generation for excessive tile count")
+    }
+
+    func testMinimumTileSizeEnforcement() {
+        // Test with tile size smaller than minimum (10.0mm)
+        let tileSize = 5.0
+        // Room 100x100
+        // If tileSize was 5, 20x20 = 400 tiles.
+        // If tileSize clamped to 10, 10x10 = 100 tiles.
+
+        let roomLength = 100.0
+        let roomWidth = 100.0
+
+        var project = Project(
+            name: "Min Tile Size Test",
+            materialType: .carpetTile,
+            roomSettings: RoomSettings(lengthMm: roomLength, widthMm: roomWidth, expansionGapMm: 0),
+            stockItems: [],
+            wasteFactor: 0.0
+        )
+
+        let settings = TileSettings(
+            tileSizeMm: tileSize,
+            pattern: .straight,
+            orientation: .monolithic,
+            reuseEdgeOffcuts: false
+        )
+        project.tileSettings = settings
+
+        let engine = TileEngine()
+        let result = engine.generateLayout(project: project, useStock: false)
+
+        // If clamped to 10mm, we expect 10x10 = 100 pieces (approx)
+        // If not clamped (5mm), we expect 20x20 = 400 pieces
+
+        XCTAssertEqual(result.placedPieces.count, 100, "Should enforce minimum tile size of 10mm")
+    }
 }
