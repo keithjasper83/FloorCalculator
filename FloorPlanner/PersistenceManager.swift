@@ -48,13 +48,19 @@ class PersistenceManager: ObservableObject {
             let backgroundContext = self.stack.container.newBackgroundContext()
             backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
-            for url in jsonFiles {
+            // Parallel processing for performance
+            DispatchQueue.concurrentPerform(iterations: jsonFiles.count) { index in
+                let url = jsonFiles[index]
                 autoreleasepool {
                     do {
                         let data = try Data(contentsOf: url, options: .mappedIfSafe)
                         let decoder = JSONDecoder()
                         decoder.dateDecodingStrategy = .iso8601
                         let project = try decoder.decode(Project.self, from: data)
+
+                        // Import into Core Data
+                        // Note: saveProject handles context.performAndWait for thread safety
+                        try self.saveProject(project, in: backgroundContext)
 
                         // Move legacy file to backup or delete
                         // For safety, let's rename extension to .migrated
@@ -65,6 +71,7 @@ class PersistenceManager: ObservableObject {
                         // Silently fail or use a non-sensitive logging mechanism
                     }
                 }
+            }
         }
     }
     
