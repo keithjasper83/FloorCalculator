@@ -23,12 +23,19 @@ class TileEngine: LayoutEngine {
         let room = project.roomSettings
         let usableLength = room.usableLengthMm
         let usableWidth = room.usableWidthMm
-        let tileSize = settings.tileSizeMm
+        // Enforce minimum tile size to prevent division by zero or extremely small values
+        let tileSize = max(settings.tileSizeMm, 10.0)
         
         // Calculate grid dimensions
         let tilesAlongLength = Int(ceil(usableLength / tileSize))
         let tilesAlongWidth = Int(ceil(usableWidth / tileSize))
         
+        // Safety check to prevent DoS with excessive tile counts
+        // Limit to 20,000 tiles which covers ~5000m² with 500mm tiles
+        if tilesAlongLength * tilesAlongWidth > 20_000 {
+            return emptyResult()
+        }
+
         // Count available stock and track prices
         var availableFullTiles = 0
         var availablePrices: [Double] = []
