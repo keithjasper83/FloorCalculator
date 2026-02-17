@@ -1,4 +1,3 @@
-
 def clean_file(filepath, imports_to_add):
     print(f"Processing {filepath}")
     with open(filepath, 'r') as f:
