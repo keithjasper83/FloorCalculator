@@ -189,12 +189,6 @@ struct ReportsView: View {
     private func exportAllCSVs() {
         guard let result = appState.layoutResult else { return }
         
-        let persistence = PersistenceManager.shared
-        let placementCSV = persistence.exportPlacementCSV(result: result)
-        let cutListCSV = persistence.exportCutListCSV(result: result, materialType: appState.currentProject.materialType)
-        let inventoryCSV = persistence.exportRemainingInventoryCSV(result: result)
-        let _ = persistence.exportPurchaseListCSV(result: result)
-        
         // TODO: Implement actual file export with ShareSheet/NSSavePanel
         // CSV data should not be printed to system logs for security reasons.
     }
