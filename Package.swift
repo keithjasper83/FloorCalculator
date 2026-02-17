@@ -25,7 +25,8 @@ let package = Package(
                 "LaminateEngine.swift",
                 "TileEngine.swift",
                 "PersistenceManager.swift",
-                "ViewExtensions.swift"
+                "ViewExtensions.swift",
+                "AppState.swift"
             ],
             resources: [
                 .process("FloorPlanner.xcdatamodeld")
