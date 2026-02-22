@@ -2,6 +2,7 @@ import SwiftUI
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
+import simd
 
 
 //
@@ -207,6 +208,7 @@ struct ARCaptureView: View {
 
 #if canImport(RoomPlan)
 @available(iOS 16.0, *)
+@MainActor
 struct RoomCaptureContainer: UIViewRepresentable {
     @Binding var roomSettings: RoomSettings
     @Environment(\.dismiss) var dismiss
@@ -216,89 +218,107 @@ struct RoomCaptureContainer: UIViewRepresentable {
         view.captureSession.delegate = context.coordinator
         view.delegate = context.coordinator
 
-        // Start session
-        let config = RoomCaptureSession.Configuration()
-        view.captureSession.run(configuration: config)
+        // Start session safely
+        if RoomCaptureSession.isSupported {
+            let config = RoomCaptureSession.Configuration()
+            view.captureSession.run(configuration: config)
+        }
 
         return view
     }
 
-    func updateUIView(_ uiView: RoomCaptureView, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+    func updateUIView(_ uiView: RoomCaptureView, context: Context) {
+        // No-op
     }
 
-    class Coordinator: NSObject, RoomCaptureViewDelegate, RoomCaptureSessionDelegate {
-        var parent: RoomCaptureContainer
+    func makeCoordinator() -> RoomCaptureCoordinator {
+        RoomCaptureCoordinator(roomSettings: $roomSettings, dismiss: { [dismiss] in dismiss() })
+    }
+}
+@available(iOS 16.0, *)
+@MainActor
+final class RoomCaptureCoordinator: NSObject, NSSecureCoding, RoomCaptureViewDelegate, RoomCaptureSessionDelegate {
 
-        init(_ parent: RoomCaptureContainer) {
-            self.parent = parent
+    let roomSettings: Binding<RoomSettings>
+    let dismissAction: @MainActor () -> Void
+
+    init(roomSettings: Binding<RoomSettings>, dismiss: @escaping @MainActor () -> Void) {
+        self.roomSettings = roomSettings
+        self.dismissAction = dismiss
+        super.init()
+    }
+
+    // MARK: - NSSecureCoding (not used, but required for certain Obj-C expectations)
+    static var supportsSecureCoding: Bool { true }
+
+    @MainActor required convenience init?(coder: NSCoder) {
+        // This coordinator is never expected to be encoded/decoded.
+        // Provide a minimal implementation to satisfy protocol requirements.
+        // We can't reconstruct required bindings from a coder, so return nil.
+        return nil
+    }
+
+    func encode(with coder: NSCoder) {
+        // No-op: the coordinator holds runtime-only state and should not be archived.
+    }
+
+    @MainActor
+    func captureView(shouldPresent roomDataForProcessing: CapturedRoomData, error: Error?) -> Bool {
+        return true
+    }
+
+    @MainActor
+    func captureView(_ view: RoomCaptureView, didPresent processedResult: CapturedRoom, error: Error?) {
+        if let error = error {
+            print("RoomPlan error: \(error)")
+            return
         }
 
-        func captureView(shouldPresent roomDataForProcessing: CapturedRoomData, error: Error?) -> Bool {
-            return true
+        var minX: Float = .infinity
+        var minZ: Float = .infinity
+        var maxX: Float = -.infinity
+        var maxZ: Float = -.infinity
+
+        var hasWalls = false
+
+        for wall in processedResult.walls {
+            hasWalls = true
+
+            let dims = wall.dimensions
+            let halfLen = dims.x / 2
+
+            let c1 = simd_float4(-halfLen, 0, 0, 1)
+            let c2 = simd_float4(halfLen, 0, 0, 1)
+
+            let p1 = wall.transform * c1
+            let p2 = wall.transform * c2
+
+            minX = min(minX, p1.x, p2.x)
+            minZ = min(minZ, p1.z, p2.z)
+            maxX = max(maxX, p1.x, p2.x)
+            maxZ = max(maxZ, p1.z, p2.z)
         }
 
-        func captureView(_ view: RoomCaptureView, didPresent processedResult: CapturedRoom, error: Error?) {
-            if let error = error {
-                print("RoomPlan error: \(error)")
-                return
+        if hasWalls {
+            let lengthMm = Double(maxX - minX) * 1000
+            let widthMm = Double(maxZ - minZ) * 1000
+
+            DispatchQueue.main.async {
+                self.roomSettings.wrappedValue.lengthMm = lengthMm
+                self.roomSettings.wrappedValue.widthMm = widthMm
+                self.roomSettings.wrappedValue.shape = .rectangular
+                self.roomSettings.wrappedValue.polygonPoints = []
+
+                self.dismissAction()
             }
-
-            // Extract geometry
-            // We'll calculate the bounding box of all walls
-            var minX: Float = .infinity
-            var minZ: Float = .infinity
-            var maxX: Float = -.infinity
-            var maxZ: Float = -.infinity
-
-            var hasWalls = false
-
-            for wall in processedResult.walls {
-                hasWalls = true
-
-                // Wall dimensions: x=length, y=height, z=width(thickness)
-                let dims = wall.dimensions
-                let halfLen = dims.x / 2
-
-                // Local corners (along the wall length)
-                let c1 = simd_float4(-halfLen, 0, 0, 1)
-                let c2 = simd_float4(halfLen, 0, 0, 1)
-
-                // Transform to world space
-                let p1 = wall.transform * c1
-                let p2 = wall.transform * c2
-
-                minX = min(minX, p1.x, p2.x)
-                minZ = min(minZ, p1.z, p2.z)
-                maxX = max(maxX, p1.x, p2.x)
-                maxZ = max(maxZ, p1.z, p2.z)
-            }
-
-            if hasWalls {
-                // Convert to mm (meters * 1000)
-                let lengthMm = Double(maxX - minX) * 1000
-                let widthMm = Double(maxZ - minZ) * 1000
-
-                DispatchQueue.main.async {
-                    // Update room settings to rectangular approximation
-                    // This is "minimum" requirement met
-                    self.parent.roomSettings.lengthMm = lengthMm
-                    self.parent.roomSettings.widthMm = widthMm
-                    self.parent.roomSettings.shape = .rectangular
-                    self.parent.roomSettings.polygonPoints = [] // clear polygon points
-
-                    self.parent.dismiss()
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.parent.dismiss()
-                }
+        } else {
+            DispatchQueue.main.async {
+                self.dismissAction()
             }
         }
     }
 }
+
 #endif
 struct RoomDesignerView: View {
     @EnvironmentObject var appState: AppState
@@ -314,6 +334,7 @@ struct RoomDesignerView: View {
     @State private var selectedSegmentIndex: Int? = nil
     @State private var editingDimension: String = ""
     @State private var showConfirmation = false
+    @State private var isClosed: Bool = false
 
     private let gridColor = Color.gray.opacity(0.3)
     private let pointColor = Color.blue
@@ -376,11 +397,11 @@ struct RoomDesignerView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        if points.count >= 3 {
+                        if (isClosed && points.count >= 3) || appState.currentProject.roomSettings.shape != .polygon {
                             showConfirmation = true
                         }
                     }
-                    .disabled(points.count < 3)
+                    .disabled(!(isClosed && points.count >= 3))
                 }
             }
             .alert("Apply Room Design?", isPresented: $showConfirmation) {
@@ -406,10 +427,10 @@ struct RoomDesignerView: View {
             Spacer()
 
             if points.count >= 3 {
-                Button(action: closePolygon) {
-                    Label("Close Shape", systemImage: "checkmark.circle")
+                Button(action: { isClosed.toggle() }) {
+                    Label(isClosed ? "Open Shape" : "Close Shape", systemImage: isClosed ? "xmark.circle" : "checkmark.circle")
                 }
-                .foregroundColor(.green)
+                .foregroundColor(isClosed ? .orange : .green)
             }
 
             Spacer()
@@ -435,7 +456,7 @@ struct RoomDesignerView: View {
                 Text("Continue tapping to add more walls")
                     .font(.subheadline)
             } else {
-                Text("Tap 'Close Shape' when done, or continue adding points")
+                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap 'Close Shape' when done, or continue adding points")
                     .font(.subheadline)
             }
 
@@ -458,7 +479,7 @@ struct RoomDesignerView: View {
             Form {
                 Section("Adjust Dimension") {
                     TextField("Distance (mm)", text: $editingDimension)
-                        .keyboardType(.numberPad)
+                        .keyboardType(.decimalPad)
                 }
             }
             .navigationTitle("Edit Dimension")
@@ -565,7 +586,7 @@ struct RoomDesignerView: View {
                 )
 
                 // Draw line segment (skip closing segment unless polygon is explicitly closed)
-                if i < points.count - 1 {
+                if i < points.count - 1 || (isClosed && points.count >= 3 && i == points.count - 1) {
                     context.stroke(
                         Path { path in
                             path.move(to: startPoint)
@@ -650,6 +671,25 @@ struct RoomDesignerView: View {
         let snappedX = round(x / gridSize) * gridSize
         let snappedY = round(y / gridSize) * gridSize
 
+        if isClosed { return }
+
+        if points.count >= 2 {
+            let tapPoint = CGPoint(x: location.x, y: location.y)
+            for i in 0..<(isClosed ? points.count : points.count - 1) {
+                let a = points[i]
+                let b = points[(i + 1) % points.count]
+                let aPt = CGPoint(x: centerX + a.x * mmToPixels, y: centerY + a.y * mmToPixels)
+                let bPt = CGPoint(x: centerX + b.x * mmToPixels, y: centerY + b.y * mmToPixels)
+                let dist = distancePointToSegment(p: tapPoint, a: aPt, b: bPt)
+                if dist < 20 {
+                    selectedSegmentIndex = i
+                    editingDimension = String(Int(hypot(b.x - a.x, b.y - a.y)))
+                    showDimensionInput = true
+                    return
+                }
+            }
+        }
+
         // Add point
         let newPoint = RoomPoint(x: snappedX, y: snappedY)
 
@@ -668,6 +708,7 @@ struct RoomDesignerView: View {
     private func undoLastPoint() {
         if !points.isEmpty {
             points.removeLast()
+            isClosed = false
         }
     }
 
@@ -676,20 +717,49 @@ struct RoomDesignerView: View {
         scale = 1.0
         offset = .zero
         lastOffset = .zero
+        isClosed = false
     }
 
     private func closePolygon() {
         if points.count >= 3 {
-            showConfirmation = true
+            isClosed = true
         }
     }
 
     private func applyDimension() {
-        // Future enhancement: adjust point positions based on entered dimension
+        guard let idx = selectedSegmentIndex,
+              let newLen = Double(editingDimension),
+              points.indices.contains(idx),
+              points.indices.contains((idx + 1) % points.count) else {
+            showDimensionInput = false
+            return
+        }
+
+        var a = points[idx]
+        var b = points[(idx + 1) % points.count]
+
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let currentLen = sqrt(dx*dx + dy*dy)
+        guard currentLen > 0 else {
+            showDimensionInput = false
+            return
+        }
+
+        let scale = newLen / currentLen
+        let newB = RoomPoint(x: a.x + dx * scale, y: a.y + dy * scale)
+        points[(idx + 1) % points.count] = newB
+
         showDimensionInput = false
     }
 
     private func applyDesign() {
+        guard isClosed && points.count >= 3 else {
+            // Fall back to existing settings if not a valid closed polygon
+            dismiss()
+            return
+        }
+
         // Convert points to room settings
         appState.currentProject.roomSettings.shape = .polygon
 
@@ -718,4 +788,15 @@ struct RoomDesignerView: View {
         appState.saveProject()
         dismiss()
     }
+
+    private func distancePointToSegment(p: CGPoint, a: CGPoint, b: CGPoint) -> CGFloat {
+        let ap = CGPoint(x: p.x - a.x, y: p.y - a.y)
+        let ab = CGPoint(x: b.x - a.x, y: b.y - a.y)
+        let abLen2 = ab.x * ab.x + ab.y * ab.y
+        if abLen2 == 0 { return hypot(ap.x, ap.y) }
+        let t = max(0, min(1, (ap.x * ab.x + ap.y * ab.y) / abLen2))
+        let proj = CGPoint(x: a.x + ab.x * t, y: a.y + ab.y * t)
+        return hypot(p.x - proj.x, p.y - proj.y)
+    }
 }
+

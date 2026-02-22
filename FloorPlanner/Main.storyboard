@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="nav-1">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21505"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--Navigation Controller-->
+        <scene sceneID="scene-nav">
+            <objects>
+                <navigationController id="nav-1" sceneMemberID="viewController" storyboardIdentifier="RootNavigationController">
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" id="nav-bar-1"/>
+                    <connections>
+                        <segue destination="root-1" kind="relationship" relationship="rootViewController" id="rel-1"/>
+                    </connections>
+                </navigationController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="nav-first" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-500" y="0"/>
+        </scene>
+        <!--Root View Controller-->
+        <scene sceneID="scene-root">
+            <objects>
+                <viewController id="root-1" customClass="UIViewController" customModuleProvider="target" sceneMemberID="viewController" storyboardIdentifier="RootViewController">
+                    <view key="view" contentMode="scaleToFill" id="root-view">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="FloorPlanner Root" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="1" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="label-1">
+                                <fontDescription key="fontDescription" type="system" pointSize="20"/>
+                                <nil key="textColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="safe-1"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
+                        <constraints>
+                            <constraint firstItem="label-1" firstAttribute="centerX" secondItem="safe-1" secondAttribute="centerX" id="c1"/>
+                            <constraint firstItem="label-1" firstAttribute="centerY" secondItem="safe-1" secondAttribute="centerY" id="c2"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="root-first" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="200" y="0"/>
+        </scene>
+    </scenes>
+</document>

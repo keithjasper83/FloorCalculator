@@ -131,7 +131,7 @@ class LaminateEngine: LayoutEngine {
                         }
                     }
 
-                    guard var piece = selectedPiece else {
+                    guard let piece = selectedPiece else {
                         // No stock available - use NEEDED pieces
                         let label = "N\(placedPieces.count + 1)"
                         let placedPiece = PlacedPiece(
@@ -352,3 +352,4 @@ class LaminateEngine: LayoutEngine {
         return segments
     }
 }
+

@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import FloorPlannerCore
+@testable import FloorPlanner
 
 final class FloorPlannerTests: XCTestCase {
     
@@ -378,3 +378,4 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(result.purchaseSuggestions[0].quantityNeeded, 2)
     }
 }
+

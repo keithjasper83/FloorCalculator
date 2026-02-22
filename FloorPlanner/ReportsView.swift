@@ -8,6 +8,12 @@
 import Foundation
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
+
 struct ReportsView: View {
     @EnvironmentObject var appState: AppState
     
@@ -34,15 +40,11 @@ struct ReportsView: View {
                             
                             Divider()
                             
-                            let usableArea = appState.currentProject.roomSettings.usableAreaM2
-                            let completionPercent: Double
-                            if usableArea > 0 {
-                                completionPercent = (result.installedAreaM2 / usableArea) * 100
-                            } else {
-                                completionPercent = 0
-                            }
-                            reportRow("Completion", value: "\(completionPercent.formatted(.number.precision(.fractionLength(1))))%",
-                                     color: completionPercent >= 99.9 ? .green : .orange)
+                            reportRow(
+                                "Completion",
+                                value: "\(((appState.currentProject.roomSettings.usableAreaM2 > 0) ? ((result.installedAreaM2 / appState.currentProject.roomSettings.usableAreaM2) * 100) : 0).formatted(.number.precision(.fractionLength(1))))%",
+                                color: ((appState.currentProject.roomSettings.usableAreaM2 > 0) ? ((result.installedAreaM2 / appState.currentProject.roomSettings.usableAreaM2) * 100) : 0) >= 99.9 ? .green : .orange
+                            )
                         }
                     }
                     
@@ -188,8 +190,58 @@ struct ReportsView: View {
     
     private func exportAllCSVs() {
         guard let result = appState.layoutResult else { return }
-        
-        // TODO: Implement actual file export with ShareSheet/NSSavePanel
-        // CSV data should not be printed to system logs for security reasons.
+
+        let placementCSV = PersistenceManager.shared.exportPlacementCSV(result: result)
+        let cutListCSV = PersistenceManager.shared.exportCutListCSV(result: result, materialType: appState.currentProject.materialType)
+        let remainingCSV = PersistenceManager.shared.exportRemainingInventoryCSV(result: result)
+        let purchaseCSV = PersistenceManager.shared.exportPurchaseListCSV(result: result)
+
+        let baseName = appState.currentProject.name.replacingOccurrences(of: "/", with: "-")
+        let files: [(name: String, data: Data)] = [
+            ("\(baseName) - Placements.csv", Data(placementCSV.utf8)),
+            ("\(baseName) - CutList.csv", Data(cutListCSV.utf8)),
+            ("\(baseName) - Remaining.csv", Data(remainingCSV.utf8)),
+            ("\(baseName) - Purchases.csv", Data(purchaseCSV.utf8))
+        ]
+
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        panel.title = "Select Export Folder"
+        if panel.runModal() == .OK, let folderURL = panel.url {
+            for file in files {
+                let url = folderURL.appendingPathComponent(file.name)
+                try? file.data.write(to: url, options: .atomic)
+            }
+        }
+        #else
+        let tempDir = FileManager.default.temporaryDirectory
+        var urls: [URL] = []
+        for file in files {
+            let url = tempDir.appendingPathComponent(file.name)
+            do {
+                try file.data.write(to: url, options: .atomic)
+                urls.append(url)
+            } catch {
+                // Skip failed writes silently
+            }
+        }
+        guard !urls.isEmpty else { return }
+
+        let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = rootVC.view
+                popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            rootVC.present(activityVC, animated: true)
+        }
+        #endif
     }
 }
+
