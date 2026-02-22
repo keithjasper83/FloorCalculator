@@ -339,6 +339,8 @@ struct RoomDesignerView: View {
     private let gridColor = Color.gray.opacity(0.3)
     private let pointColor = Color.blue
     private let lineColor = Color.blue
+    private let closePolygonTapThreshold: CGFloat = 25
+    private let closeTargetRingRadius: CGFloat = 14
 
     var body: some View {
         NavigationStack {
@@ -456,7 +458,7 @@ struct RoomDesignerView: View {
                 Text("Continue tapping to add more walls")
                     .font(.subheadline)
             } else {
-                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap 'Close Shape' when done, or continue adding points")
+                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap the first point (green) to close the shape, or use 'Close Shape'")
                     .font(.subheadline)
             }
 
@@ -616,11 +618,30 @@ struct RoomDesignerView: View {
         }
 
         // Draw points
-        for point in points {
+        for (index, point) in points.enumerated() {
             let screenPoint = CGPoint(
                 x: centerX + point.x * mmToPixels,
                 y: centerY + point.y * mmToPixels
             )
+
+            // Highlight the first point in green when 3+ points exist and shape is open,
+            // indicating the user can tap it to close the polygon.
+            let isCloseTarget = index == 0 && points.count >= 3 && !isClosed
+            let fillColor: Color = isCloseTarget ? .green : pointColor
+
+            if isCloseTarget {
+                // Draw a larger ring around the first point as a close-target indicator
+                context.stroke(
+                    Path(ellipseIn: CGRect(
+                        x: screenPoint.x - closeTargetRingRadius,
+                        y: screenPoint.y - closeTargetRingRadius,
+                        width: closeTargetRingRadius * 2,
+                        height: closeTargetRingRadius * 2
+                    )),
+                    with: .color(.green.opacity(0.6)),
+                    lineWidth: 2
+                )
+            }
 
             context.fill(
                 Path(ellipseIn: CGRect(
@@ -629,7 +650,7 @@ struct RoomDesignerView: View {
                     width: 12,
                     height: 12
                 )),
-                with: .color(pointColor)
+                with: .color(fillColor)
             )
 
             context.stroke(
@@ -672,6 +693,20 @@ struct RoomDesignerView: View {
         let snappedY = round(y / gridSize) * gridSize
 
         if isClosed { return }
+
+        // Close polygon by tapping near the first point (standard polygon-drawing UX)
+        if points.count >= 3 {
+            let firstPoint = points[0]
+            let firstScreenPoint = CGPoint(
+                x: centerX + firstPoint.x * mmToPixels,
+                y: centerY + firstPoint.y * mmToPixels
+            )
+            let distToFirst = hypot(location.x - firstScreenPoint.x, location.y - firstScreenPoint.y)
+            if distToFirst < closePolygonTapThreshold {
+                isClosed = true
+                return
+            }
+        }
 
         if points.count >= 2 {
             let tapPoint = CGPoint(x: location.x, y: location.y)
