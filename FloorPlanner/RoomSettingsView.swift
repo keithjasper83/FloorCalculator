@@ -270,53 +270,114 @@ final class RoomCaptureCoordinator: NSObject, NSSecureCoding, RoomCaptureViewDel
     @MainActor
     func captureView(_ view: RoomCaptureView, didPresent processedResult: CapturedRoom, error: Error?) {
         if let error = error {
-            print("RoomPlan error: \(error)")
+            DiagnosticsManager.shared.log(error: error, context: "RoomPlan capture")
+            DispatchQueue.main.async { self.dismissAction() }
             return
         }
 
-        var minX: Float = .infinity
-        var minZ: Float = .infinity
-        var maxX: Float = -.infinity
-        var maxZ: Float = -.infinity
-
-        var hasWalls = false
-
-        for wall in processedResult.walls {
-            hasWalls = true
-
-            let dims = wall.dimensions
-            let halfLen = dims.x / 2
-
-            let c1 = simd_float4(-halfLen, 0, 0, 1)
-            let c2 = simd_float4(halfLen, 0, 0, 1)
-
-            let p1 = wall.transform * c1
-            let p2 = wall.transform * c2
-
-            minX = min(minX, p1.x, p2.x)
-            minZ = min(minZ, p1.z, p2.z)
-            maxX = max(maxX, p1.x, p2.x)
-            maxZ = max(maxZ, p1.z, p2.z)
+        guard !processedResult.walls.isEmpty else {
+            DispatchQueue.main.async { self.dismissAction() }
+            return
         }
 
-        if hasWalls {
-            let lengthMm = Double(maxX - minX) * 1000
-            let widthMm = Double(maxZ - minZ) * 1000
+        // Extract each wall's two endpoints in the world XZ plane (Y is height, not floor plan).
+        // simd_float2.x = world X, simd_float2.y = world Z.
+        var segments: [(simd_float2, simd_float2)] = []
+        for wall in processedResult.walls {
+            let halfLen = wall.dimensions.x / 2
+            let p1w = wall.transform * simd_float4(-halfLen, 0, 0, 1)
+            let p2w = wall.transform * simd_float4(halfLen, 0, 0, 1)
+            segments.append((simd_float2(p1w.x, p1w.z), simd_float2(p2w.x, p2w.z)))
+        }
+
+        // Chain wall segments into an ordered polygon outline.
+        let chain = chainWallsToPolygon(segments)
+
+        if chain.count >= 3 {
+            // Convert metres → mm and normalise so minimum is at (0, 0).
+            let rawPoints = chain.map { RoomPoint(x: Double($0.x) * 1000, y: Double($0.y) * 1000) }
+            let minX = rawPoints.map { $0.x }.min() ?? 0
+            let minY = rawPoints.map { $0.y }.min() ?? 0
+            let polygonPoints = rawPoints.map { RoomPoint(x: $0.x - minX, y: $0.y - minY) }
+            let maxX = polygonPoints.map { $0.x }.max() ?? 0
+            let maxY = polygonPoints.map { $0.y }.max() ?? 0
 
             DispatchQueue.main.async {
-                self.roomSettings.wrappedValue.lengthMm = lengthMm
-                self.roomSettings.wrappedValue.widthMm = widthMm
-                self.roomSettings.wrappedValue.shape = .rectangular
-                self.roomSettings.wrappedValue.polygonPoints = []
-
+                self.roomSettings.wrappedValue.shape = .polygon
+                self.roomSettings.wrappedValue.polygonPoints = polygonPoints
+                self.roomSettings.wrappedValue.lengthMm = maxX
+                self.roomSettings.wrappedValue.widthMm = maxY
                 self.dismissAction()
             }
         } else {
+            // Fallback: bounding-box rectangle if chaining failed.
+            var minX: Float = .infinity, minZ: Float = .infinity
+            var maxX: Float = -.infinity, maxZ: Float = -.infinity
+            for seg in segments {
+                minX = min(minX, seg.0.x, seg.1.x)
+                minZ = min(minZ, seg.0.y, seg.1.y)
+                maxX = max(maxX, seg.0.x, seg.1.x)
+                maxZ = max(maxZ, seg.0.y, seg.1.y)
+            }
             DispatchQueue.main.async {
+                self.roomSettings.wrappedValue.lengthMm = Double(maxX - minX) * 1000
+                self.roomSettings.wrappedValue.widthMm = Double(maxZ - minZ) * 1000
+                self.roomSettings.wrappedValue.shape = .rectangular
+                self.roomSettings.wrappedValue.polygonPoints = []
                 self.dismissAction()
             }
         }
     }
+}
+
+/// Greedy segment-chaining algorithm that orders wall endpoint pairs into a polygon.
+///
+/// Each wall provides two endpoints. We greedily find the next segment whose nearer
+/// endpoint connects to the current chain tip (within `tolerance` metres), appending
+/// the far endpoint. Duplicate closing vertices are removed.
+@available(iOS 16.0, *)
+private func chainWallsToPolygon(_ segments: [(simd_float2, simd_float2)]) -> [simd_float2] {
+    guard !segments.isEmpty else { return [] }
+
+    // Tolerance for considering two endpoints "the same corner" (150 mm = 0.15 m)
+    let tolerance: Float = 0.15
+
+    var remaining = segments
+    var chain = [remaining[0].0, remaining[0].1]
+    remaining.removeFirst()
+
+    while !remaining.isEmpty {
+        let tip = chain.last!
+        var bestIndex = -1
+        var bestDist = tolerance
+        // true  → seg.0 matched tip, so add seg.1 as next vertex
+        // false → seg.1 matched tip, so add seg.0 as next vertex
+        var useP2AsNext = false
+
+        for (i, seg) in remaining.enumerated() {
+            let d0 = hypot(tip.x - seg.0.x, tip.y - seg.0.y)
+            let d1 = hypot(tip.x - seg.1.x, tip.y - seg.1.y)
+            // Pick whichever endpoint of this segment is closer to tip
+            let (closerDist, addP2) = d0 <= d1 ? (d0, true) : (d1, false)
+            if closerDist < bestDist {
+                bestDist = closerDist
+                bestIndex = i
+                useP2AsNext = addP2
+            }
+        }
+
+        guard bestIndex >= 0 else { break }
+        let seg = remaining[bestIndex]
+        chain.append(useP2AsNext ? seg.1 : seg.0)
+        remaining.remove(at: bestIndex)
+    }
+
+    // Drop the closing vertex if it's the same as the first (polygon is implicitly closed).
+    if chain.count > 1 && hypot(chain[0].x - chain.last!.x, chain[0].y - chain.last!.y) < tolerance {
+        chain.removeLast()
+    }
+
+    return chain
 }
 
 #endif
