@@ -231,6 +231,11 @@ struct RoomCaptureContainer: UIViewRepresentable {
         // No-op
     }
 
+    static func dismantleUIView(_ uiView: RoomCaptureView, coordinator: RoomCaptureCoordinator) {
+        // Always stop the session when the view is dismantled to prevent ARKit crashes
+        uiView.captureSession.stop()
+    }
+
     func makeCoordinator() -> RoomCaptureCoordinator {
         RoomCaptureCoordinator(roomSettings: $roomSettings, dismiss: { [dismiss] in dismiss() })
     }
@@ -268,7 +273,7 @@ final class RoomCaptureCoordinator: NSObject, NSSecureCoding, RoomCaptureViewDel
     }
 
     @MainActor
-    func captureView(_ view: RoomCaptureView, didPresent processedResult: CapturedRoom, error: Error?) {
+    func captureView(didPresent processedResult: CapturedRoom, error: Error?) {
         if let error = error {
             DiagnosticsManager.shared.log(error: error, context: "RoomPlan capture")
             DispatchQueue.main.async { self.dismissAction() }
