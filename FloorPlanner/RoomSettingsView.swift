@@ -4,6 +4,83 @@ import RoomPlan
 #endif
 import simd
 
+// MARK: - Floor plan helpers
+#if canImport(RoomPlan)
+/// Simple 2D point on the floor plane used for chaining wall segments (x = world X, y = world Z)
+struct FloorPoint: Hashable {
+    var x: Float
+    var y: Float
+
+    init(_ x: Float, _ y: Float) {
+        self.x = x
+        self.y = y
+    }
+}
+
+/// Chains unordered wall segments into an ordered polygonal path by greedily connecting nearest endpoints.
+/// Assumes the walls roughly form a loop; returns an empty array if it cannot chain at least 3 unique points.
+@inline(__always)
+private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [FloorPoint] {
+    guard !segments.isEmpty else { return [] }
+
+    // Build adjacency list of endpoints by proximity
+    var remaining = segments
+    var path: [FloorPoint] = []
+
+    // Start from the first segment's first endpoint
+    var current = remaining.removeFirst().0
+    path.append(current)
+
+    // Helper to compute squared distance
+    func dist2(_ a: FloorPoint, _ b: FloorPoint) -> Float {
+        let dx = a.x - b.x
+        let dy = a.y - b.y
+        return dx*dx + dy*dy
+    }
+
+    // Greedily connect to the nearest available endpoint until we loop back close to start
+    let maxIterations = segments.count * 4
+    var iterations = 0
+    while !remaining.isEmpty && iterations < maxIterations {
+        iterations += 1
+        var bestIdx: Int? = nil
+        var bestPoint: FloorPoint? = nil
+        var bestScore: Float = .infinity
+
+        for (idx, seg) in remaining.enumerated() {
+            // Consider both endpoints
+            let candidates = [seg.0, seg.1]
+            for c in candidates {
+                let s = dist2(current, c)
+                if s < bestScore {
+                    bestScore = s
+                    bestPoint = (c.x == seg.0.x && c.y == seg.0.y) ? seg.1 : seg.0 // take the opposite endpoint to advance
+                    bestIdx = idx
+                }
+            }
+        }
+
+        guard let idx = bestIdx, let next = bestPoint else { break }
+        // Advance to next point and remove the used segment
+        current = next
+        path.append(current)
+        remaining.remove(at: idx)
+
+        // If we have formed a loop (close to the first point), stop
+        if path.count >= 3, dist2(current, path[0]) < 0.01 { // ~10 cm threshold squared in meters^2
+            break
+        }
+    }
+
+    // Remove potential duplicate last point if it loops back
+    if path.count >= 2, path.first == path.last {
+        path.removeLast()
+    }
+
+    return path
+}
+#endif
+
 
 //
 //  RoomSettingsView.swift

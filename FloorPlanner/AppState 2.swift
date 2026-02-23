@@ -72,3 +72,4 @@ final class AppState: ObservableObject {
         saveProject()
     }
 }
+
