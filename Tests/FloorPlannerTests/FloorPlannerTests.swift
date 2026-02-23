@@ -47,7 +47,9 @@ final class FloorPlannerTests: XCTestCase {
     }
 
     func testLaminateEngineUsesNarrowBoards() {
-        // Room width 820mm → usable 800mm = 2 × 300mm rows + 1 × 200mm row
+        // Room: 820mm wide × 2000mm long
+        // Usable width = 820 - 2 × 10mm gap = 800mm
+        // 2 × 300mm rows = 600mm; remaining = 200mm → 200mm board fits exactly
         // Stock: two 300mm boards and one 200mm board; all should be placed.
         let project = Project(
             name: "Narrow Board Test",
