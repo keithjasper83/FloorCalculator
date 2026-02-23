@@ -64,7 +64,7 @@ final class AppState: ObservableObject {
         do {
             try PersistenceManager.shared.saveProject(currentProject)
         } catch {
-            // Suppress detailed logging for privacy; consider surfacing non-sensitive UI feedback if needed.
+            DiagnosticsManager.shared.log(error: error, context: "AppState.saveProject")
         }
     }
 

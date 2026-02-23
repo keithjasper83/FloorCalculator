@@ -76,6 +76,10 @@ class AppState: ObservableObject {
 
     func saveProject() {
         currentProject.modifiedAt = Date()
-        try? PersistenceManager.shared.saveProject(currentProject)
+        do {
+            try PersistenceManager.shared.saveProject(currentProject)
+        } catch {
+            DiagnosticsManager.shared.log(error: error, context: "AppState.saveProject")
+        }
     }
 }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @State private var showDiagnostics = false
     
     var body: some View {
         #if targetEnvironment(macCatalyst)
@@ -86,6 +87,10 @@ struct ContentView: View {
                         Button("Save Project") {
                             appState.saveProject()
                         }
+
+                        Button("Diagnostics") {
+                            showDiagnostics = true
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -93,6 +98,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $appState.showMaterialPicker) {
                 MaterialPickerView()
+            }
+            .sheet(isPresented: $showDiagnostics) {
+                DiagnosticsView()
             }
         }
     }
@@ -207,10 +215,17 @@ struct ContentView: View {
                     Button("Save Project") {
                         appState.saveProject()
                     }
+
+                    Button("Diagnostics") {
+                        showDiagnostics = true
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .sheet(isPresented: $showDiagnostics) {
+            DiagnosticsView()
         }
     }
     

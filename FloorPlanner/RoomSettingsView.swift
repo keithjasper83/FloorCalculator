@@ -231,6 +231,11 @@ struct RoomCaptureContainer: UIViewRepresentable {
         // No-op
     }
 
+    static func dismantleUIView(_ uiView: RoomCaptureView, coordinator: RoomCaptureCoordinator) {
+        // Always stop the session when the view is dismantled to prevent ARKit crashes
+        uiView.captureSession.stop()
+    }
+
     func makeCoordinator() -> RoomCaptureCoordinator {
         RoomCaptureCoordinator(roomSettings: $roomSettings, dismiss: { [dismiss] in dismiss() })
     }
@@ -268,53 +273,59 @@ final class RoomCaptureCoordinator: NSObject, NSSecureCoding, RoomCaptureViewDel
     }
 
     @MainActor
-    func captureView(_ view: RoomCaptureView, didPresent processedResult: CapturedRoom, error: Error?) {
+    func captureView(didPresent processedResult: CapturedRoom, error: Error?) {
         if let error = error {
-            print("RoomPlan error: \(error)")
+            DiagnosticsManager.shared.log(error: error, context: "RoomPlan capture")
+            dismissAction()
             return
         }
 
-        var minX: Float = .infinity
-        var minZ: Float = .infinity
-        var maxX: Float = -.infinity
-        var maxZ: Float = -.infinity
-
-        var hasWalls = false
-
-        for wall in processedResult.walls {
-            hasWalls = true
-
-            let dims = wall.dimensions
-            let halfLen = dims.x / 2
-
-            let c1 = simd_float4(-halfLen, 0, 0, 1)
-            let c2 = simd_float4(halfLen, 0, 0, 1)
-
-            let p1 = wall.transform * c1
-            let p2 = wall.transform * c2
-
-            minX = min(minX, p1.x, p2.x)
-            minZ = min(minZ, p1.z, p2.z)
-            maxX = max(maxX, p1.x, p2.x)
-            maxZ = max(maxZ, p1.z, p2.z)
+        guard !processedResult.walls.isEmpty else {
+            dismissAction()
+            return
         }
 
-        if hasWalls {
-            let lengthMm = Double(maxX - minX) * 1000
-            let widthMm = Double(maxZ - minZ) * 1000
+        // Extract each wall's two endpoints in the world XZ plane (Y is height, not floor plan).
+        var segments: [(FloorPoint, FloorPoint)] = []
+        for wall in processedResult.walls {
+            let halfLen = wall.dimensions.x / 2
+            let p1w = wall.transform * simd_float4(-halfLen, 0, 0, 1)
+            let p2w = wall.transform * simd_float4(halfLen, 0, 0, 1)
+            segments.append((FloorPoint(p1w.x, p1w.z), FloorPoint(p2w.x, p2w.z)))
+        }
 
-            DispatchQueue.main.async {
-                self.roomSettings.wrappedValue.lengthMm = lengthMm
-                self.roomSettings.wrappedValue.widthMm = widthMm
-                self.roomSettings.wrappedValue.shape = .rectangular
-                self.roomSettings.wrappedValue.polygonPoints = []
+        // Chain wall segments into an ordered polygon outline.
+        let chain = chainWallSegments(segments)
 
-                self.dismissAction()
-            }
+        if chain.count >= 3 {
+            // Convert metres → mm and normalise so minimum is at (0, 0).
+            let rawPoints = chain.map { RoomPoint(x: Double($0.x) * 1000, y: Double($0.y) * 1000) }
+            let minX = rawPoints.map { $0.x }.min() ?? 0
+            let minY = rawPoints.map { $0.y }.min() ?? 0
+            let polygonPoints = rawPoints.map { RoomPoint(x: $0.x - minX, y: $0.y - minY) }
+            let maxX = polygonPoints.map { $0.x }.max() ?? 0
+            let maxY = polygonPoints.map { $0.y }.max() ?? 0
+
+            roomSettings.wrappedValue.shape = .polygon
+            roomSettings.wrappedValue.polygonPoints = polygonPoints
+            roomSettings.wrappedValue.lengthMm = maxX
+            roomSettings.wrappedValue.widthMm = maxY
+            dismissAction()
         } else {
-            DispatchQueue.main.async {
-                self.dismissAction()
+            // Fallback: bounding-box rectangle if chaining failed.
+            var minX: Float = .infinity, minZ: Float = .infinity
+            var maxX: Float = -.infinity, maxZ: Float = -.infinity
+            for seg in segments {
+                minX = min(minX, seg.0.x, seg.1.x)
+                minZ = min(minZ, seg.0.y, seg.1.y)
+                maxX = max(maxX, seg.0.x, seg.1.x)
+                maxZ = max(maxZ, seg.0.y, seg.1.y)
             }
+            roomSettings.wrappedValue.lengthMm = Double(maxX - minX) * 1000
+            roomSettings.wrappedValue.widthMm = Double(maxZ - minZ) * 1000
+            roomSettings.wrappedValue.shape = .rectangular
+            roomSettings.wrappedValue.polygonPoints = []
+            dismissAction()
         }
     }
 }
@@ -339,6 +350,8 @@ struct RoomDesignerView: View {
     private let gridColor = Color.gray.opacity(0.3)
     private let pointColor = Color.blue
     private let lineColor = Color.blue
+    private let closePolygonTapThreshold: CGFloat = 25
+    private let closeTargetRingRadius: CGFloat = 14
 
     var body: some View {
         NavigationStack {
@@ -456,7 +469,7 @@ struct RoomDesignerView: View {
                 Text("Continue tapping to add more walls")
                     .font(.subheadline)
             } else {
-                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap 'Close Shape' when done, or continue adding points")
+                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap the first point (green) to close the shape, or use 'Close Shape'")
                     .font(.subheadline)
             }
 
@@ -616,11 +629,30 @@ struct RoomDesignerView: View {
         }
 
         // Draw points
-        for point in points {
+        for (index, point) in points.enumerated() {
             let screenPoint = CGPoint(
                 x: centerX + point.x * mmToPixels,
                 y: centerY + point.y * mmToPixels
             )
+
+            // Highlight the first point in green when 3+ points exist and shape is open,
+            // indicating the user can tap it to close the polygon.
+            let isCloseTarget = index == 0 && points.count >= 3 && !isClosed
+            let fillColor: Color = isCloseTarget ? .green : pointColor
+
+            if isCloseTarget {
+                // Draw a larger ring around the first point as a close-target indicator
+                context.stroke(
+                    Path(ellipseIn: CGRect(
+                        x: screenPoint.x - closeTargetRingRadius,
+                        y: screenPoint.y - closeTargetRingRadius,
+                        width: closeTargetRingRadius * 2,
+                        height: closeTargetRingRadius * 2
+                    )),
+                    with: .color(.green.opacity(0.6)),
+                    lineWidth: 2
+                )
+            }
 
             context.fill(
                 Path(ellipseIn: CGRect(
@@ -629,7 +661,7 @@ struct RoomDesignerView: View {
                     width: 12,
                     height: 12
                 )),
-                with: .color(pointColor)
+                with: .color(fillColor)
             )
 
             context.stroke(
@@ -672,6 +704,20 @@ struct RoomDesignerView: View {
         let snappedY = round(y / gridSize) * gridSize
 
         if isClosed { return }
+
+        // Close polygon by tapping near the first point (standard polygon-drawing UX)
+        if points.count >= 3 {
+            let firstPoint = points[0]
+            let firstScreenPoint = CGPoint(
+                x: centerX + firstPoint.x * mmToPixels,
+                y: centerY + firstPoint.y * mmToPixels
+            )
+            let distToFirst = hypot(location.x - firstScreenPoint.x, location.y - firstScreenPoint.y)
+            if distToFirst < closePolygonTapThreshold {
+                isClosed = true
+                return
+            }
+        }
 
         if points.count >= 2 {
             let tapPoint = CGPoint(x: location.x, y: location.y)
