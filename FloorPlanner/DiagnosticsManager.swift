@@ -48,15 +48,20 @@ final class DiagnosticsManager {
     // MARK: - Install (call once at app startup, before any other code runs)
 
     func install() {
-        // Pre-store the crash log path in a C-safe global for the signal handler
+        // Archive any crash marker left by the PREVIOUS session before we set up the
+        // new session's path. This ensures a crash that fires immediately after install()
+        // writes to the pending file rather than racing with archiving.
+        archivePendingSignalCrash()
+
+        // Pre-store the crash log path in a C-safe global for the signal handler.
+        // Use count-1 as the copy limit to guarantee space for the null terminator.
         let signalCrashPath = logsDirectory.appendingPathComponent("crash_signal_pending.txt").path
         signalCrashPath.withCString { ptr in
             let len = strlen(ptr)
-            _ = memcpy(&gSignalCrashLogPath, ptr, min(len + 1, gSignalCrashLogPath.count - 1))
+            let copyLen = min(len, gSignalCrashLogPath.count - 1)
+            _ = memcpy(&gSignalCrashLogPath, ptr, copyLen)
+            gSignalCrashLogPath[Int(copyLen)] = 0
         }
-
-        // If a signal crash marker file exists from the previous session, archive it
-        archivePendingSignalCrash()
 
         // Uncaught Objective-C / Swift exception handler (Foundation-safe context)
         NSSetUncaughtExceptionHandler { exception in
