@@ -24,50 +24,55 @@ class LaminateEngine: LayoutEngine {
         let usableLength = room.usableLengthMm
         let usableWidth = room.usableWidthMm
         
-        // Determine primary width
+        // Determine primary width (used as fallback for "needed" pieces)
         let primaryWidth = determinePrimaryWidth(stockItems: project.stockItems, settings: settings)
         
-        // Collect available pieces
+        // Collect ALL available pieces including narrow boards
         var availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)] = []
         
         if useStock && !project.stockItems.isEmpty {
-            for item in project.stockItems where abs(item.widthMm - primaryWidth) < Constants.geometryToleranceMm {
+            for item in project.stockItems {
                 for _ in 0..<item.quantity {
                     availablePieces.append((item.lengthMm, item.widthMm, .stock, item.pricePerUnit))
                 }
             }
         }
         
-        // Sort by length descending
-        availablePieces.sort { $0.length > $1.length }
+        // Sort by width descending then length descending so wider/longer boards are preferred
+        availablePieces.sort {
+            if abs($0.width - $1.width) > Constants.geometryToleranceMm { return $0.width > $1.width }
+            return $0.length > $1.length
+        }
         
         var placedPieces: [PlacedPiece] = []
         var cutRecords: [CutRecord] = []
         var offcuts: [(length: Double, width: Double)] = []
         var usedStockCost = 0.0
         
-        // Determine row direction
-        // If along length: rows run parallel to Length, so we stack them along Width
-        // If along width: rows run parallel to Width, so we stack them along Length
-        let (rowLength, rowCount) = settings.plankDirection == .alongLength
-            ? (usableLength, Int(ceil(usableWidth / primaryWidth)))
-            : (usableWidth, Int(ceil(usableLength / primaryWidth)))
-        
+        // Determine direction: roomDepth is the dimension we stack rows across
+        let roomDepth = settings.plankDirection == .alongLength ? usableWidth : usableLength
+        let rowLength = settings.plankDirection == .alongLength ? usableLength : usableWidth
+
         var currentY = 0.0
         var lastRowStartOffset = 0.0
-        
-        // Place rows
-        for row in 0..<rowCount {
+        var row = 0
+
+        // Place rows dynamically; row width is determined from available stock at each iteration
+        while currentY < roomDepth - Constants.geometryToleranceMm {
+            let remaining = roomDepth - currentY
+
+            // Pick the widest board width available that fits the remaining depth.
+            // Falls back to defaultPlankWidthMm (capped at remaining) when no stock is left.
+            let rowWidth = largestFittingWidth(
+                remaining: remaining,
+                availablePieces: availablePieces,
+                offcuts: offcuts,
+                defaultWidth: primaryWidth
+            )
+
+            if rowWidth < Constants.snapToleranceMm { break }
+
             let rowY = currentY
-            
-            // Check if we have space for this row
-            let remainingWidth = settings.plankDirection == .alongLength
-                ? (usableWidth - rowY)
-                : (usableLength - rowY)
-            
-            if remainingWidth < primaryWidth * 0.1 {
-                break
-            }
             
             // Calculate row start offset for stagger
             var rowStartOffset = 0.0
@@ -86,7 +91,7 @@ class LaminateEngine: LayoutEngine {
             lastRowStartOffset = rowStartOffset
             
             // Get valid segments for this row (intersects with polygon)
-            let segments = getSegments(room: room, rowCenterY: rowY + primaryWidth/2)
+            let segments = getSegments(room: room, rowCenterY: rowY + rowWidth / 2)
             
             // Fill each segment
             for (segStart, segEnd) in segments {
@@ -106,24 +111,23 @@ class LaminateEngine: LayoutEngine {
                         continue
                     }
 
-                    // Try to find a piece that fits targetLength
+                    // Try to find a piece matching rowWidth and long enough
                     var pieceIndex = -1
                     var selectedPiece: (length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)?
 
-                    // First try offcuts
+                    // First try offcuts (must match rowWidth)
                     for (index, offcut) in offcuts.enumerated() {
-                        if offcut.length >= targetLength {
+                        if abs(offcut.width - rowWidth) < Constants.geometryToleranceMm && offcut.length >= targetLength {
                             pieceIndex = -1000 - index
-                            // Offcuts are free (cost attributed to parent)
                             selectedPiece = (offcut.length, offcut.width, .offcut, nil)
                             break
                         }
                     }
                     
-                    // Then try available stock
+                    // Then try available stock (must match rowWidth)
                     if selectedPiece == nil {
                         for (index, piece) in availablePieces.enumerated() {
-                            if piece.length >= targetLength {
+                            if abs(piece.width - rowWidth) < Constants.geometryToleranceMm && piece.length >= targetLength {
                                 pieceIndex = index
                                 selectedPiece = piece
                                 break
@@ -138,7 +142,7 @@ class LaminateEngine: LayoutEngine {
                             x: currentX,
                             y: rowY,
                             lengthMm: targetLength,
-                            widthMm: primaryWidth,
+                            widthMm: rowWidth,
                             label: label,
                             source: .needed,
                             status: .needed,
@@ -202,7 +206,8 @@ class LaminateEngine: LayoutEngine {
                 }
             }
             
-            currentY += primaryWidth
+            currentY += rowWidth
+            row += 1
         }
         
         // Build remaining pieces list
@@ -287,6 +292,32 @@ class LaminateEngine: LayoutEngine {
         return settings.defaultPlankWidthMm
     }
     
+    /// Returns the largest board width available in stock/offcuts that fits within `remaining`.
+    /// Falls back to `min(defaultWidth, remaining)` when no stock is available.
+    private func largestFittingWidth(
+        remaining: Double,
+        availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)],
+        offcuts: [(length: Double, width: Double)],
+        defaultWidth: Double
+    ) -> Double {
+        var maxFitting = 0.0
+        for piece in availablePieces {
+            if piece.width <= remaining + Constants.geometryToleranceMm && piece.width > maxFitting {
+                maxFitting = piece.width
+            }
+        }
+        for offcut in offcuts {
+            if offcut.width <= remaining + Constants.geometryToleranceMm && offcut.width > maxFitting {
+                maxFitting = offcut.width
+            }
+        }
+        if maxFitting > Constants.geometryToleranceMm {
+            return min(maxFitting, remaining)
+        }
+        // No stock available; use default width (capped at remaining space)
+        return min(defaultWidth, remaining)
+    }
+
     // Helper to find valid segments for a row in a polygon room
     private func getSegments(room: RoomSettings, rowCenterY: Double) -> [(Double, Double)] {
         // If rectangular, just return full width

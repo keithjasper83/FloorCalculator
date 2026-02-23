@@ -6,10 +6,13 @@
 //
 
 import Foundation
+#if canImport(CoreData)
 import CoreData
 import Combine
 import CloudKit
+#endif
 
+#if canImport(CoreData)
 class PersistenceManager: ObservableObject {
     static let shared = PersistenceManager()
     
@@ -431,8 +434,30 @@ class PersistenceManager: ObservableObject {
         return csv
     }
 }
+#else
+// MARK: - Minimal stub for non-Apple platforms (Linux / Swift Package Manager without CoreData)
+class PersistenceManager {
+    static let shared = PersistenceManager()
+    private init() {}
+
+    func exportPlacementCSV(result: LayoutResult) -> String {
+        var csv = "Label,X(mm),Y(mm),Length(mm),Width(mm),Source,Status,Rotation\n"
+        for piece in result.placedPieces {
+            csv += "\(piece.label),\(piece.x),\(piece.y),\(piece.lengthMm),\(piece.widthMm),"
+            csv += "\(piece.source.rawValue),\(piece.status.rawValue),\(piece.rotation)\n"
+        }
+        return csv
+    }
+
+    func saveProject(_ project: Project) throws {}
+    func listProjects() throws -> [Project] { return [] }
+    func loadProject(id: UUID) throws -> Project? { return nil }
+    func deleteProject(_ project: Project) throws {}
+}
+#endif
 
 // MARK: - Core Data Stack
+#if canImport(CoreData)
 
 class CoreDataStack: ObservableObject {
     static let shared = CoreDataStack()
@@ -605,3 +630,4 @@ extension RoomSettingsEntity {
     @objc(removePolygonPoints:)
     @NSManaged public func removeFromPolygonPoints(_ values: NSSet)
 }
+#endif // canImport(CoreData)
