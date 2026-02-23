@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import FloorPlanner
+@testable import FloorPlannerCore
 
 final class FloorPlannerTests: XCTestCase {
     
@@ -44,6 +44,31 @@ final class FloorPlannerTests: XCTestCase {
         let totalAccountedArea = result.installedAreaM2 + result.neededAreaM2 + result.wasteAreaM2 + result.surplusAreaM2
         let stockArea = LayoutUtilities.calculateStockArea(stockItems: project.stockItems)
         XCTAssertEqual(totalAccountedArea, stockArea, accuracy: 1.0)
+    }
+
+    func testLaminateEngineUsesNarrowBoards() {
+        // Room width 820mm → usable 800mm = 2 × 300mm rows + 1 × 200mm row
+        // Stock: two 300mm boards and one 200mm board; all should be placed.
+        let project = Project(
+            name: "Narrow Board Test",
+            materialType: .laminate,
+            roomSettings: RoomSettings(lengthMm: 2000, widthMm: 820, expansionGapMm: 10),
+            stockItems: [
+                StockItem(lengthMm: 2000, widthMm: 300, quantity: 2),
+                StockItem(lengthMm: 2000, widthMm: 200, quantity: 1)
+            ],
+            wasteFactor: 0.0
+        )
+        let engine = LaminateEngine()
+        let result = engine.generateLayout(project: project, useStock: true)
+
+        // All three boards should contribute installed area
+        XCTAssertGreaterThan(result.installedAreaM2, 0)
+
+        // Verify both 300mm and 200mm pieces appear in the layout
+        let widthsUsed = Set(result.placedPieces.filter { $0.status == .installed }.map { $0.widthMm })
+        XCTAssertTrue(widthsUsed.contains(300), "300 mm boards should be placed")
+        XCTAssertTrue(widthsUsed.contains(200), "200 mm narrow boards should be placed")
     }
     
     func testLaminateEngineWithoutStock() {

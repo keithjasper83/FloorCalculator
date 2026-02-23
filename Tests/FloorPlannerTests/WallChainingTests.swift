@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import FloorPlanner
+@testable import FloorPlannerCore
 
 final class WallChainingTests: XCTestCase {
 
