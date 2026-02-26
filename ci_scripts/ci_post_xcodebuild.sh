@@ -208,6 +208,11 @@ MAX_RETRIES=5
 RETRY_DELAY=6
 BUILD_RUN_ID="${CI_BUILD_ID:-}"
 UNRESOLVED_ERRORS=0
+SEARCH_FILE=""
+
+# Ensure any temp file created by the search loop is always cleaned up.
+_cleanup_search_file() { rm -f "$SEARCH_FILE"; }
+trap _cleanup_search_file EXIT
 
 log "Querying MCP server for current build issues (run_id=${BUILD_RUN_ID:-unknown}) …"
 
@@ -218,7 +223,7 @@ while [ "$retry" -lt "$MAX_RETRIES" ]; do
         _RUN_ID="$BUILD_RUN_ID" \
         _PROJECT="${CI_XCODE_PROJECT:-}" \
         _SCHEME="${CI_SCHEME:-}" \
-        python3 - <<'PYEOF'
+        python3 - <<'PYEOF2'
 import json, os
 
 run_id  = os.environ.get("_RUN_ID",  "").strip()
@@ -246,8 +251,8 @@ payload = {
 if run_id:
     payload["params"]["arguments"]["filter"] = {"run_id": run_id}
 print(json.dumps(payload))
-PYEOF
-    )
+PYEOF2
+    ) || true
 
     SEARCH_FILE=$(mktemp "/tmp/mcp_issues_${BUILD_RUN_ID:-$$}_XXXXXX.json")
 
@@ -262,27 +267,22 @@ PYEOF
         --max-time 30 \
         "$INGEST_ENDPOINT" 2>/dev/null) || {
             log "WARNING: curl failed during build-issue query – skipping issue check."
-            rm -f "$SEARCH_FILE"
             break
         }
 
     SEARCH_RESPONSE=$(cat "$SEARCH_FILE" 2>/dev/null || true)
-    rm -f "$SEARCH_FILE"
+    rm -f "$SEARCH_FILE"; SEARCH_FILE=""
 
     if [ "$SEARCH_STATUS" -ge 200 ] && [ "$SEARCH_STATUS" -lt 300 ]; then
         ISSUE_SUMMARY=$(  \
-            _RUN_ID="$BUILD_RUN_ID" \
             _SEARCH_RESPONSE="$SEARCH_RESPONSE" \
-            python3 - <<'PYEOF'
+            python3 - <<'PYEOF2'
 import json, os, sys
 
-run_id = os.environ.get("_RUN_ID", "").strip()
 raw = os.environ.get("_SEARCH_RESPONSE", "")
 try:
     data = json.loads(raw)
     hits = data.get("result", {}).get("hits", [])
-    if run_id:
-        hits = [h for h in hits if h.get("payload", {}).get("run_id") == run_id]
     errors   = [h for h in hits if "error"   in h.get("payload", {}).get("text", "").lower()]
     warnings = [h for h in hits if "warning" in h.get("payload", {}).get("text", "").lower()
                 and "error" not in h.get("payload", {}).get("text", "").lower()]
@@ -293,12 +293,18 @@ try:
         print(f"  [{i}] score={score:.3f} | {text}")
 except Exception as e:
     print(json.dumps({"hits": 0, "errors": 0, "warnings": 0, "parse_error": str(e)}))
-PYEOF
-        )
+PYEOF2
+        ) || true
 
-        COUNTS_LINE=$(echo "$ISSUE_SUMMARY" | head -1)
-        ISSUE_COUNT=$(echo "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('hits',0))" 2>/dev/null || echo "0")
-        ERROR_COUNT=$(echo "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('errors',0))" 2>/dev/null || echo "0")
+        COUNTS_LINE=$(printf '%s\n' "$ISSUE_SUMMARY" | head -1)
+        ISSUE_COUNT=$(printf '%s\n' "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('hits',0))" 2>/dev/null) || {
+            log "WARNING: Failed to parse MCP issue summary for hits; defaulting to 0. Raw: $COUNTS_LINE"
+            ISSUE_COUNT=0
+        }
+        ERROR_COUNT=$(printf '%s\n' "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('errors',0))" 2>/dev/null) || {
+            log "WARNING: Failed to parse MCP issue summary for errors; defaulting to 0. Raw: $COUNTS_LINE"
+            ERROR_COUNT=0
+        }
 
         if [ "${ISSUE_COUNT:-0}" -gt 0 ]; then
             log "MCP returned ${ISSUE_COUNT} issue(s) (${ERROR_COUNT} error(s)) for this run:"
