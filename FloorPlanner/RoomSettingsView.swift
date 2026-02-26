@@ -5,8 +5,58 @@ import RoomPlan
 import simd
 
 // MARK: - Floor plan helpers
-// FloorPoint and chainWallSegments are defined in WallChaining.swift (module-level),
-// and are used here for RoomPlan wall extraction.
+#if canImport(RoomPlan)
+/// Simple 2D point on the floor plane used for chaining wall segments (x = world X, y = world Z).
+/// Defined here (app target) because WallChaining.swift is only compiled in the Swift Package target.
+struct FloorPoint: Hashable {
+    var x: Float
+    var y: Float
+
+    init(_ x: Float, _ y: Float) {
+        self.x = x
+        self.y = y
+    }
+}
+
+/// Chains unordered wall-endpoint segments into an ordered polygon path.
+/// Greedily connects nearest endpoints until the polygon closes or no matching endpoint remains.
+private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [FloorPoint] {
+    guard !segments.isEmpty else { return [] }
+
+    var remaining = segments
+    var current = remaining.removeFirst().0
+    var path: [FloorPoint] = [current]
+
+    func dist2(_ a: FloorPoint, _ b: FloorPoint) -> Float {
+        let dx = a.x - b.x; let dy = a.y - b.y
+        return dx*dx + dy*dy
+    }
+
+    let maxIter = segments.count * 4
+    for _ in 0..<maxIter {
+        guard !remaining.isEmpty else { break }
+        var bestIdx: Int?
+        var bestNext: FloorPoint?
+        var bestScore: Float = .infinity
+
+        for (idx, seg) in remaining.enumerated() {
+            let d0 = dist2(current, seg.0)
+            let d1 = dist2(current, seg.1)
+            if d0 < bestScore { bestScore = d0; bestNext = seg.1; bestIdx = idx }
+            if d1 < bestScore { bestScore = d1; bestNext = seg.0; bestIdx = idx }
+        }
+
+        guard let idx = bestIdx, let next = bestNext else { break }
+        current = next
+        path.append(current)
+        remaining.remove(at: idx)
+        if path.count >= 3, dist2(current, path[0]) < 0.01 { break }
+    }
+
+    if path.count >= 2, path.first == path.last { path.removeLast() }
+    return path
+}
+#endif
 
 
 //
@@ -526,9 +576,10 @@ struct RoomDesignerView: View {
                             let a = points[i]
                             let b = points[(i + 1) % points.count]
                             let length = sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2))
+                            let roundedLength = Int(length.rounded())
                             Button {
                                 selectedSegmentIndex = i
-                                editingDimension = String(format: "%.0f", length)
+                                editingDimension = String(roundedLength)
                                 showDimensionInput = true
                             } label: {
                                 VStack(spacing: 2) {
@@ -536,7 +587,7 @@ struct RoomDesignerView: View {
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                     HStack(spacing: 2) {
-                                        Text("\(Int(length)) mm")
+                                        Text("\(roundedLength) mm")
                                             .font(.caption)
                                             .fontWeight(.semibold)
                                         Image(systemName: "pencil")
@@ -571,12 +622,12 @@ struct RoomDesignerView: View {
                    points.count >= 2 {
                     let a = points[idx]
                     let b = points[(idx + 1) % points.count]
-                    let currentLen = sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2))
+                    let currentLen = Int(sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2)).rounded())
                     Section("Wall \(idx + 1) — Current Length") {
                         HStack {
                             Text("Length")
                             Spacer()
-                            Text("\(Int(currentLen)) mm")
+                            Text("\(currentLen) mm")
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -794,29 +845,9 @@ struct RoomDesignerView: View {
         let snappedX = round(x / gridSize) * gridSize
         let snappedY = round(y / gridSize) * gridSize
 
-        // Check if tapping near an existing wall segment first — works even when polygon is closed
-        if points.count >= 2 {
-            let tapPoint = CGPoint(x: location.x, y: location.y)
-            let segCount = isClosed ? points.count : points.count - 1
-            for i in 0..<segCount {
-                let a = points[i]
-                let b = points[(i + 1) % points.count]
-                let aPt = CGPoint(x: centerX + a.x * mmToPixels, y: centerY + a.y * mmToPixels)
-                let bPt = CGPoint(x: centerX + b.x * mmToPixels, y: centerY + b.y * mmToPixels)
-                let dist = distancePointToSegment(p: tapPoint, a: aPt, b: bPt)
-                if dist < 20 {
-                    selectedSegmentIndex = i
-                    editingDimension = String(Int(hypot(b.x - a.x, b.y - a.y)))
-                    showDimensionInput = true
-                    return
-                }
-            }
-        }
-
-        if isClosed { return }
-
-        // Close polygon by tapping near the first point (standard polygon-drawing UX)
-        if points.count >= 3 {
+        // When the shape is still open and closeable, check the first-point close target FIRST.
+        // This prevents a wall-segment hit-test near the first point from blocking polygon closure.
+        if !isClosed && points.count >= 3 {
             let firstPoint = points[0]
             let firstScreenPoint = CGPoint(
                 x: centerX + firstPoint.x * mmToPixels,
@@ -828,6 +859,27 @@ struct RoomDesignerView: View {
                 return
             }
         }
+
+        // Check if tapping near an existing wall segment — works even when polygon is closed
+        if points.count >= 2 {
+            let tapPoint = CGPoint(x: location.x, y: location.y)
+            let segCount = isClosed ? points.count : points.count - 1
+            for i in 0..<segCount {
+                let a = points[i]
+                let b = points[(i + 1) % points.count]
+                let aPt = CGPoint(x: centerX + a.x * mmToPixels, y: centerY + a.y * mmToPixels)
+                let bPt = CGPoint(x: centerX + b.x * mmToPixels, y: centerY + b.y * mmToPixels)
+                let dist = distancePointToSegment(p: tapPoint, a: aPt, b: bPt)
+                if dist < 20 {
+                    selectedSegmentIndex = i
+                    editingDimension = String(Int(hypot(b.x - a.x, b.y - a.y).rounded()))
+                    showDimensionInput = true
+                    return
+                }
+            }
+        }
+
+        if isClosed { return }
 
         // Add point
         let newPoint = RoomPoint(x: snappedX, y: snappedY)
