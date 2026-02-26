@@ -7,12 +7,10 @@
 
 set -e
 
+DEFAULT_MCP_SERVER_URL="https://relay.Jarvis.kjdev.uk"
+
 log() { echo "[ci_pre_xcodebuild] $*"; }
 
-if [ -z "${MCP_SERVER_URL:-}" ]; then
-    log "WARNING: MCP_SERVER_URL secret is not set."
-    log "         Build logs will NOT be posted to the MCP server."
-    log "         Add MCP_SERVER_URL in Xcode Cloud → Workflow → Environment."
-else
-    log "MCP_SERVER_URL is configured – build artifacts will be ingested after build."
-fi
+MCP_SERVER_URL="${MCP_SERVER_URL:-$DEFAULT_MCP_SERVER_URL}"
+log "MCP server URL: $MCP_SERVER_URL"
+log "Build artifacts will be ingested to the MCP server after build."

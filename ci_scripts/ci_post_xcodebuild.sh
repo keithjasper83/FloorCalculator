@@ -27,17 +27,22 @@ set -e
 
 log() { echo "[ci_post_xcodebuild] $*"; }
 
-require_var() {
-    eval "val=\${$1}"
-    if [ -z "$val" ]; then
-        log "WARNING: environment variable '$1' is not set – skipping MCP ingestion."
-        exit 0
-    fi
-}
+# ── guards: required tools and MCP_SERVER_URL must be configured ─────────────
 
-# ── guard: MCP_SERVER_URL must be configured ─────────────────────────────────
+if [ -z "${MCP_SERVER_URL:-}" ]; then
+    MCP_SERVER_URL="https://relay.Jarvis.kjdev.uk"
+    log "MCP_SERVER_URL not set – using default: $MCP_SERVER_URL"
+fi
 
-require_var MCP_SERVER_URL
+if ! command -v python3 >/dev/null 2>&1; then
+    log "WARNING: python3 not found – skipping MCP ingestion."
+    exit 0
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+    log "WARNING: curl not found – skipping MCP ingestion."
+    exit 0
+fi
 
 log "MCP server: $MCP_SERVER_URL"
 log "Project   : ${CI_XCODE_PROJECT:-unknown}"
@@ -49,11 +54,14 @@ log "Run ID    : ${CI_BUILD_ID:-unknown}"
 
 RAW_LOG=""
 if [ -n "$CI_LOG_DIR" ] && [ -d "$CI_LOG_DIR" ]; then
-    LOG_FILE=$(find "$CI_LOG_DIR" -name "*.log" -type f 2>/dev/null | head -1)
-    if [ -n "$LOG_FILE" ]; then
-        # Tail to stay within reasonable payload size (last 2000 lines)
-        RAW_LOG=$(tail -2000 "$LOG_FILE" 2>/dev/null || true)
-        log "Collected log: $LOG_FILE ($(echo "$RAW_LOG" | wc -l | tr -d ' ') lines)"
+    # Use the most recently modified log file; tail all others and prepend
+    LOG_FILES=$(find "$CI_LOG_DIR" -name "*.log" -type f 2>/dev/null \
+        | xargs ls -t 2>/dev/null)
+    if [ -n "$LOG_FILES" ]; then
+        # Concatenate all logs then tail to a reasonable payload size
+        RAW_LOG=$(echo "$LOG_FILES" | xargs cat 2>/dev/null | tail -2000 || true)
+        LOG_COUNT=$(echo "$LOG_FILES" | wc -l | tr -d ' ')
+        log "Collected $LOG_COUNT log file(s) from $CI_LOG_DIR ($(echo "$RAW_LOG" | wc -l | tr -d ' ') lines)"
     fi
 fi
 
@@ -164,22 +172,25 @@ fi
 
 log "Posting artifacts to $INGEST_ENDPOINT …"
 
+RESPONSE_FILE=$(mktemp "/tmp/mcp_ingest_${CI_BUILD_ID:-$$}_XXXXXX.json")
+
 HTTP_STATUS=$(curl \
     --silent \
-    --show-error \
     --write-out "%{http_code}" \
-    --output /tmp/mcp_ingest_response.json \
+    --output "$RESPONSE_FILE" \
     --request POST \
     --header "Content-Type: application/json" \
     ${AUTH_HEADER:+--header "$AUTH_HEADER"} \
     --data "$PAYLOAD" \
     --max-time 60 \
-    "$INGEST_ENDPOINT" 2>&1) || {
+    "$INGEST_ENDPOINT" 2>/dev/null) || {
         log "WARNING: curl failed – MCP ingestion skipped."
+        rm -f "$RESPONSE_FILE"
         exit 0
     }
 
-RESPONSE=$(cat /tmp/mcp_ingest_response.json 2>/dev/null || true)
+RESPONSE=$(cat "$RESPONSE_FILE" 2>/dev/null || true)
+rm -f "$RESPONSE_FILE"
 
 if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
     log "Ingestion succeeded (HTTP $HTTP_STATUS)."

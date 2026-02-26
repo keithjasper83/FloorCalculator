@@ -7,9 +7,13 @@
 
 set -e
 
+DEFAULT_MCP_SERVER_URL="https://relay.Jarvis.kjdev.uk"
+MCP_SERVER_URL="${MCP_SERVER_URL:-$DEFAULT_MCP_SERVER_URL}"
+
 log() { echo "[ci_post_clone] $*"; }
 
 log "Repository cloned successfully."
+log "MCP server URL: $MCP_SERVER_URL"
 
 if command -v python3 >/dev/null 2>&1; then
     log "python3 available: $(python3 --version 2>&1)"
