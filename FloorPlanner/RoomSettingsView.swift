@@ -6,7 +6,8 @@ import simd
 
 // MARK: - Floor plan helpers
 #if canImport(RoomPlan)
-/// Simple 2D point on the floor plane used for chaining wall segments (x = world X, y = world Z)
+/// Simple 2D point on the floor plane used for chaining wall segments (x = world X, y = world Z).
+/// Defined here (app target) because WallChaining.swift is only compiled in the Swift Package target.
 struct FloorPoint: Hashable {
     var x: Float
     var y: Float
@@ -17,66 +18,42 @@ struct FloorPoint: Hashable {
     }
 }
 
-/// Chains unordered wall segments into an ordered polygonal path by greedily connecting nearest endpoints.
-/// Assumes the walls roughly form a loop; returns an empty array if it cannot chain at least 3 unique points.
-@inline(__always)
+/// Chains unordered wall-endpoint segments into an ordered polygon path.
+/// Greedily connects nearest endpoints until the polygon closes or no matching endpoint remains.
 private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [FloorPoint] {
     guard !segments.isEmpty else { return [] }
 
-    // Build adjacency list of endpoints by proximity
     var remaining = segments
-    var path: [FloorPoint] = []
-
-    // Start from the first segment's first endpoint
     var current = remaining.removeFirst().0
-    path.append(current)
+    var path: [FloorPoint] = [current]
 
-    // Helper to compute squared distance
     func dist2(_ a: FloorPoint, _ b: FloorPoint) -> Float {
-        let dx = a.x - b.x
-        let dy = a.y - b.y
+        let dx = a.x - b.x; let dy = a.y - b.y
         return dx*dx + dy*dy
     }
 
-    // Greedily connect to the nearest available endpoint until we loop back close to start
-    let maxIterations = segments.count * 4
-    var iterations = 0
-    while !remaining.isEmpty && iterations < maxIterations {
-        iterations += 1
-        var bestIdx: Int? = nil
-        var bestPoint: FloorPoint? = nil
+    let maxIter = segments.count * 4
+    for _ in 0..<maxIter {
+        guard !remaining.isEmpty else { break }
+        var bestIdx: Int?
+        var bestNext: FloorPoint?
         var bestScore: Float = .infinity
 
         for (idx, seg) in remaining.enumerated() {
-            // Consider both endpoints
-            let candidates = [seg.0, seg.1]
-            for c in candidates {
-                let s = dist2(current, c)
-                if s < bestScore {
-                    bestScore = s
-                    bestPoint = (c.x == seg.0.x && c.y == seg.0.y) ? seg.1 : seg.0 // take the opposite endpoint to advance
-                    bestIdx = idx
-                }
-            }
+            let d0 = dist2(current, seg.0)
+            let d1 = dist2(current, seg.1)
+            if d0 < bestScore { bestScore = d0; bestNext = seg.1; bestIdx = idx }
+            if d1 < bestScore { bestScore = d1; bestNext = seg.0; bestIdx = idx }
         }
 
-        guard let idx = bestIdx, let next = bestPoint else { break }
-        // Advance to next point and remove the used segment
+        guard let idx = bestIdx, let next = bestNext else { break }
         current = next
         path.append(current)
         remaining.remove(at: idx)
-
-        // If we have formed a loop (close to the first point), stop
-        if path.count >= 3, dist2(current, path[0]) < 0.01 { // ~10 cm threshold squared in meters^2
-            break
-        }
+        if path.count >= 3, dist2(current, path[0]) < 0.01 { break }
     }
 
-    // Remove potential duplicate last point if it loops back
-    if path.count >= 2, path.first == path.last {
-        path.removeLast()
-    }
-
+    if path.count >= 2, path.first == path.last { path.removeLast() }
     return path
 }
 #endif
@@ -234,7 +211,7 @@ struct RoomSettingsView: View {
             }
         }
         .sheet(isPresented: $showDesigner) {
-            RoomDesignerView()
+            RoomDesignerView(initialPoints: appState.currentProject.roomSettings.polygonPoints)
         }
         #if os(iOS)
         .sheet(isPresented: $showARScanner) {
@@ -412,7 +389,7 @@ struct RoomDesignerView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
-    @State private var points: [RoomPoint] = []
+    @State private var points: [RoomPoint]
     @State private var currentPoint: CGPoint? = nil
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
@@ -422,7 +399,12 @@ struct RoomDesignerView: View {
     @State private var selectedSegmentIndex: Int? = nil
     @State private var editingDimension: String = ""
     @State private var showConfirmation = false
-    @State private var isClosed: Bool = false
+    @State private var isClosed: Bool
+
+    init(initialPoints: [RoomPoint] = []) {
+        _points = State(initialValue: initialPoints)
+        _isClosed = State(initialValue: initialPoints.count >= 3)
+    }
 
     private let gridColor = Color.gray.opacity(0.3)
     private let pointColor = Color.blue
@@ -470,6 +452,11 @@ struct RoomDesignerView: View {
                     }
                 }
                 .background(Color(white: 0.95))
+
+                // Wall dimensions panel (shown when 2+ points exist)
+                if points.count >= 2 {
+                    wallDimensionsList
+                }
 
                 // Instructions
                 instructionsView
@@ -546,7 +533,7 @@ struct RoomDesignerView: View {
                 Text("Continue tapping to add more walls")
                     .font(.subheadline)
             } else {
-                Text(isClosed ? "Shape is closed. You can edit or press Done to apply" : "Tap the first point (green) to close the shape, or use 'Close Shape'")
+                Text(isClosed ? "Shape closed · tap a wall button above or a wall on the canvas to edit its length" : "Tap the first point (green) to close the shape, or use 'Close Shape'")
                     .font(.subheadline)
             }
 
@@ -564,15 +551,93 @@ struct RoomDesignerView: View {
         .background(Color(white: 0.9))
     }
 
+    // Wall dimensions panel – horizontal scroll of edit buttons for each wall segment
+    @ViewBuilder
+    private var wallDimensionsList: some View {
+        let wallCount = isClosed ? points.count : max(0, points.count - 1)
+        if wallCount > 0 {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Wall Dimensions")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("Tap to edit")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<wallCount, id: \.self) { i in
+                            let a = points[i]
+                            let b = points[(i + 1) % points.count]
+                            let length = sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2))
+                            let roundedLength = Int(length.rounded())
+                            Button {
+                                selectedSegmentIndex = i
+                                editingDimension = String(roundedLength)
+                                showDimensionInput = true
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text("W\(i + 1)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    HStack(spacing: 2) {
+                                        Text("\(roundedLength) mm")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                        Image(systemName: "pencil")
+                                            .font(.caption2)
+                                    }
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selectedSegmentIndex == i ? Color.blue.opacity(0.18) : Color.blue.opacity(0.08))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                                )
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+            }
+            .background(Color(white: 0.92))
+        }
+    }
+
     private var dimensionInputSheet: some View {
         NavigationStack {
             Form {
-                Section("Adjust Dimension") {
-                    TextField("Distance (mm)", text: $editingDimension)
+                if let idx = selectedSegmentIndex,
+                   idx < points.count,
+                   points.count >= 2 {
+                    let a = points[idx]
+                    let b = points[(idx + 1) % points.count]
+                    let currentLen = Int(sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2)).rounded())
+                    Section("Wall \(idx + 1) — Current Length") {
+                        HStack {
+                            Text("Length")
+                            Spacer()
+                            Text("\(currentLen) mm")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                Section("New Length (mm)") {
+                    TextField("Enter length in mm", text: $editingDimension)
                         .keyboardType(.decimalPad)
                 }
             }
-            .navigationTitle("Edit Dimension")
+            .navigationTitle(selectedSegmentIndex.map { "Edit Wall \($0 + 1)" } ?? "Edit Dimension")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -780,10 +845,9 @@ struct RoomDesignerView: View {
         let snappedX = round(x / gridSize) * gridSize
         let snappedY = round(y / gridSize) * gridSize
 
-        if isClosed { return }
-
-        // Close polygon by tapping near the first point (standard polygon-drawing UX)
-        if points.count >= 3 {
+        // When the shape is still open and closeable, check the first-point close target FIRST.
+        // This prevents a wall-segment hit-test near the first point from blocking polygon closure.
+        if !isClosed && points.count >= 3 {
             let firstPoint = points[0]
             let firstScreenPoint = CGPoint(
                 x: centerX + firstPoint.x * mmToPixels,
@@ -796,9 +860,11 @@ struct RoomDesignerView: View {
             }
         }
 
+        // Check if tapping near an existing wall segment — works even when polygon is closed
         if points.count >= 2 {
             let tapPoint = CGPoint(x: location.x, y: location.y)
-            for i in 0..<(isClosed ? points.count : points.count - 1) {
+            let segCount = isClosed ? points.count : points.count - 1
+            for i in 0..<segCount {
                 let a = points[i]
                 let b = points[(i + 1) % points.count]
                 let aPt = CGPoint(x: centerX + a.x * mmToPixels, y: centerY + a.y * mmToPixels)
@@ -806,12 +872,14 @@ struct RoomDesignerView: View {
                 let dist = distancePointToSegment(p: tapPoint, a: aPt, b: bPt)
                 if dist < 20 {
                     selectedSegmentIndex = i
-                    editingDimension = String(Int(hypot(b.x - a.x, b.y - a.y)))
+                    editingDimension = String(Int(hypot(b.x - a.x, b.y - a.y).rounded()))
                     showDimensionInput = true
                     return
                 }
             }
         }
+
+        if isClosed { return }
 
         // Add point
         let newPoint = RoomPoint(x: snappedX, y: snappedY)
