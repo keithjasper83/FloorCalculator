@@ -296,7 +296,7 @@ struct RoomCaptureContainer: UIViewRepresentable {
 }
 @available(iOS 16.0, *)
 @MainActor
-final class RoomCaptureCoordinator: NSObject, @preconcurrency NSSecureCoding, @preconcurrency RoomCaptureViewDelegate, @preconcurrency RoomCaptureSessionDelegate {
+final class RoomCaptureCoordinator: NSObject, @preconcurrency NSSecureCoding, @preconcurrency RoomCaptureViewDelegate, RoomCaptureSessionDelegate {
 
     let roomSettings: Binding<RoomSettings>
     let dismissAction: @MainActor () -> Void
