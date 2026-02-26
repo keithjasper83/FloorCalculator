@@ -296,7 +296,7 @@ struct RoomCaptureContainer: UIViewRepresentable {
 }
 @available(iOS 16.0, *)
 @MainActor
-final class RoomCaptureCoordinator: NSObject, NSSecureCoding, RoomCaptureViewDelegate, RoomCaptureSessionDelegate {
+final class RoomCaptureCoordinator: NSObject, @preconcurrency NSSecureCoding, @preconcurrency RoomCaptureViewDelegate, @preconcurrency RoomCaptureSessionDelegate {
 
     let roomSettings: Binding<RoomSettings>
     let dismissAction: @MainActor () -> Void
@@ -926,8 +926,8 @@ struct RoomDesignerView: View {
             return
         }
 
-        var a = points[idx]
-        var b = points[(idx + 1) % points.count]
+        let a = points[idx]
+        let b = points[(idx + 1) % points.count]
 
         let dx = b.x - a.x
         let dy = b.y - a.y
