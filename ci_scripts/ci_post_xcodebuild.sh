@@ -199,3 +199,132 @@ else
     log "WARNING: MCP server returned HTTP $HTTP_STATUS – ingestion may have failed."
     log "Response: $RESPONSE"
 fi
+
+# ── query MCP server for current build issues ─────────────────────────────────
+# After ingesting, fetch the most recent build logs from the MCP server and
+# loop through issues until all are resolved (or max retries exhausted).
+
+MAX_RETRIES=5
+RETRY_DELAY=6
+BUILD_RUN_ID="${CI_BUILD_ID:-}"
+UNRESOLVED_ERRORS=0
+
+log "Querying MCP server for current build issues (run_id=${BUILD_RUN_ID:-unknown}) …"
+
+retry=0
+while [ "$retry" -lt "$MAX_RETRIES" ]; do
+
+    SEARCH_PAYLOAD=$(  \
+        _RUN_ID="$BUILD_RUN_ID" \
+        _PROJECT="${CI_XCODE_PROJECT:-}" \
+        _SCHEME="${CI_SCHEME:-}" \
+        python3 - <<'PYEOF'
+import json, os
+
+run_id  = os.environ.get("_RUN_ID",  "").strip()
+project = os.environ.get("_PROJECT", "").strip()
+scheme  = os.environ.get("_SCHEME",  "").strip()
+
+# Build a targeted query from available context
+parts = ["build error warning failure"]
+if project:
+    parts.append(project)
+if scheme:
+    parts.append(scheme)
+query = " ".join(parts)
+
+payload = {
+    "method": "tools/call",
+    "params": {
+        "name": "brain_search",
+        "arguments": {
+            "query": query,
+            "k": 20
+        }
+    }
+}
+if run_id:
+    payload["params"]["arguments"]["filter"] = {"run_id": run_id}
+print(json.dumps(payload))
+PYEOF
+    )
+
+    SEARCH_FILE=$(mktemp "/tmp/mcp_issues_${BUILD_RUN_ID:-$$}_XXXXXX.json")
+
+    SEARCH_STATUS=$(curl \
+        --silent \
+        --write-out "%{http_code}" \
+        --output "$SEARCH_FILE" \
+        --request POST \
+        --header "Content-Type: application/json" \
+        ${AUTH_HEADER:+--header "$AUTH_HEADER"} \
+        --data "$SEARCH_PAYLOAD" \
+        --max-time 30 \
+        "$INGEST_ENDPOINT" 2>/dev/null) || {
+            log "WARNING: curl failed during build-issue query – skipping issue check."
+            rm -f "$SEARCH_FILE"
+            break
+        }
+
+    SEARCH_RESPONSE=$(cat "$SEARCH_FILE" 2>/dev/null || true)
+    rm -f "$SEARCH_FILE"
+
+    if [ "$SEARCH_STATUS" -ge 200 ] && [ "$SEARCH_STATUS" -lt 300 ]; then
+        ISSUE_SUMMARY=$(  \
+            _RUN_ID="$BUILD_RUN_ID" \
+            _SEARCH_RESPONSE="$SEARCH_RESPONSE" \
+            python3 - <<'PYEOF'
+import json, os, sys
+
+run_id = os.environ.get("_RUN_ID", "").strip()
+raw = os.environ.get("_SEARCH_RESPONSE", "")
+try:
+    data = json.loads(raw)
+    hits = data.get("result", {}).get("hits", [])
+    if run_id:
+        hits = [h for h in hits if h.get("payload", {}).get("run_id") == run_id]
+    errors   = [h for h in hits if "error"   in h.get("payload", {}).get("text", "").lower()]
+    warnings = [h for h in hits if "warning" in h.get("payload", {}).get("text", "").lower()
+                and "error" not in h.get("payload", {}).get("text", "").lower()]
+    print(json.dumps({"hits": len(hits), "errors": len(errors), "warnings": len(warnings)}))
+    for i, hit in enumerate(hits, 1):
+        text = hit.get("payload", {}).get("text", "")[:200].replace("\n", " ")
+        score = hit.get("score", 0)
+        print(f"  [{i}] score={score:.3f} | {text}")
+except Exception as e:
+    print(json.dumps({"hits": 0, "errors": 0, "warnings": 0, "parse_error": str(e)}))
+PYEOF
+        )
+
+        COUNTS_LINE=$(echo "$ISSUE_SUMMARY" | head -1)
+        ISSUE_COUNT=$(echo "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('hits',0))" 2>/dev/null || echo "0")
+        ERROR_COUNT=$(echo "$COUNTS_LINE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('errors',0))" 2>/dev/null || echo "0")
+
+        if [ "${ISSUE_COUNT:-0}" -gt 0 ]; then
+            log "MCP returned ${ISSUE_COUNT} issue(s) (${ERROR_COUNT} error(s)) for this run:"
+            printf '%s\n' "$ISSUE_SUMMARY" | tail -n +2 | while IFS= read -r line; do
+                log "$line"
+            done
+            UNRESOLVED_ERRORS="${ERROR_COUNT:-0}"
+            break
+        else
+            retry=$((retry + 1))
+            if [ "$retry" -lt "$MAX_RETRIES" ]; then
+                log "No issues indexed yet (attempt $retry/$MAX_RETRIES) – retrying in ${RETRY_DELAY}s …"
+                sleep "$RETRY_DELAY"
+            else
+                log "No build issues found in MCP server after $MAX_RETRIES attempts – all clear."
+            fi
+        fi
+    else
+        log "WARNING: MCP server returned HTTP $SEARCH_STATUS during issue query."
+        break
+    fi
+done
+
+if [ "${UNRESOLVED_ERRORS:-0}" -gt 0 ]; then
+    log "ERROR: $UNRESOLVED_ERRORS unresolved build error(s) found in MCP server. Fix them before the next build."
+    exit 1
+fi
+
+log "Build issue check complete."
