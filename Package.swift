@@ -18,7 +18,27 @@ let package = Package(
         .target(
             name: "FloorPlannerCore",
             path: "FloorPlanner",
-            exclude: ["Info.plist", "FloorPlanner.entitlements"],
+            exclude: [
+                "Info.plist",
+                "FloorPlanner.entitlements",
+                "FloorPlannerApp.swift",
+                "ContentView.swift",
+                "MaterialPickerView.swift",
+                "MaterialSettingsView.swift",
+                "PreviewView.swift",
+                "ReportsView.swift",
+                "RoomSettingsView.swift",
+                "StockTableView.swift",
+                "ViewExtensions.swift",
+                "AppState.swift",
+                "AppState 2.swift",
+                "DiagnosticsManager.swift",
+                "DiagnosticsManager 2.swift",
+                "DiagnosticsView.swift",
+                "DiagnosticsView 2.swift",
+                "Main.storyboard",
+                "Assets.xcassets"
+            ],
             sources: [
                 "Models.swift",
                 "LayoutEngine.swift",
