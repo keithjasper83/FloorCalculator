@@ -245,3 +245,20 @@ struct ReportsView: View {
     }
 }
 
+#Preview("Reports · Discrete") {
+    PreviewHost(
+        title: "Reports",
+        appState: PreviewFactory.appState(materialType: .laminate, includeLayout: true)
+    ) {
+        ReportsView()
+    }
+}
+
+#Preview("Reports · Continuous") {
+    PreviewHost(
+        title: "Reports",
+        appState: PreviewFactory.appState(materialType: .paint, includeLayout: true)
+    ) {
+        ReportsView()
+    }
+}

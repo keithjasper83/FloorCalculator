@@ -386,6 +386,33 @@ final class RoomCaptureCoordinator: NSObject, @preconcurrency NSSecureCoding, @p
 
 #endif
 struct RoomDesignerView: View {
+    private enum DimensionEditMode: String, CaseIterable, Identifiable {
+        case preserveShape = "Preserve Shape"
+        case moveSingleCorner = "Move One Corner"
+
+        var id: String { rawValue }
+    }
+
+    private enum AngleConstraintMode: String, CaseIterable, Identifiable {
+        case free = "Free"
+        case deg45 = "45°"
+        case deg90 = "90°"
+        case deg135 = "135°"
+        case deg180 = "180°"
+
+        var id: String { rawValue }
+
+        var angleDegrees: Double? {
+            switch self {
+            case .free: return nil
+            case .deg45: return 45
+            case .deg90: return 90
+            case .deg135: return 135
+            case .deg180: return 180
+            }
+        }
+    }
+
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
@@ -398,6 +425,12 @@ struct RoomDesignerView: View {
     @State private var showDimensionInput = false
     @State private var selectedSegmentIndex: Int? = nil
     @State private var editingDimension: String = ""
+    @State private var dimensionEditMode: DimensionEditMode = .preserveShape
+    @State private var angleConstraintMode: AngleConstraintMode = .free
+    @State private var draggedPointIndex: Int? = nil
+    @State private var lockedCornerIndices: Set<Int> = []
+    @State private var dimensionEditErrorMessage: String?
+    @State private var showDimensionEditError = false
     @State private var showConfirmation = false
     @State private var isClosed: Bool
 
@@ -406,9 +439,15 @@ struct RoomDesignerView: View {
         _isClosed = State(initialValue: initialPoints.count >= 3)
     }
 
-    private let gridColor = Color.gray.opacity(0.3)
-    private let pointColor = Color.blue
-    private let lineColor = Color.blue
+    private let gridColor = Color.gray.opacity(0.22)
+    private let pointColor = Color(red: 0.08, green: 0.16, blue: 0.28)
+    private let lineColor = Color.black
+    private let lockedColor = Color.orange
+    private let extensionLineColor = Color.gray.opacity(0.65)
+    private let dimensionLineColor = Color(red: 0.1, green: 0.2, blue: 0.45)
+    private let dimensionOffsetBase: CGFloat = 26
+    private let dimensionOffsetStep: CGFloat = 14
+    private let extensionLeadIn: CGFloat = 8
     private let closePolygonTapThreshold: CGFloat = 25
     private let closeTargetRingRadius: CGFloat = 14
 
@@ -429,15 +468,10 @@ struct RoomDesignerView: View {
                         .gesture(
                             DragGesture()
                                 .onChanged { value in
-                                    if !showDimensionInput {
-                                        offset = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                    }
+                                    handleCanvasDragChanged(value: value, in: geometry.size)
                                 }
                                 .onEnded { _ in
-                                    lastOffset = offset
+                                    handleCanvasDragEnded()
                                 }
                         )
                         .gesture(
@@ -457,6 +491,12 @@ struct RoomDesignerView: View {
                 if points.count >= 2 {
                     wallDimensionsList
                 }
+
+                if points.count >= 3 {
+                    cornerConstraintList
+                }
+
+                angleConstraintBar
 
                 // Instructions
                 instructionsView
@@ -491,6 +531,11 @@ struct RoomDesignerView: View {
             }
             .sheet(isPresented: $showDimensionInput) {
                 dimensionInputSheet
+            }
+            .alert("Unable to Apply Dimension", isPresented: $showDimensionEditError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(dimensionEditErrorMessage ?? "This edit would violate a locked corner constraint.")
             }
         }
     }
@@ -542,6 +587,8 @@ struct RoomDesignerView: View {
                 Spacer()
                 Text("Grid: \(Int(gridSize))mm")
                 Spacer()
+                Text("Angle Lock: \(angleConstraintMode.rawValue)")
+                Spacer()
                 Text("Zoom: \(scale, specifier: "%.1f")x")
             }
             .font(.caption)
@@ -549,6 +596,50 @@ struct RoomDesignerView: View {
         }
         .padding()
         .background(Color(white: 0.9))
+    }
+
+    private var angleConstraintBar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Line Angle Lock")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Relative to previous point")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(AngleConstraintMode.allCases) { mode in
+                        let selected = angleConstraintMode == mode
+                        Button {
+                            angleConstraintMode = mode
+                        } label: {
+                            Text(mode.rawValue)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selected ? Color.teal.opacity(0.20) : Color.teal.opacity(0.08))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.teal.opacity(selected ? 0.55 : 0.35), lineWidth: 1)
+                                )
+                        }
+                        .foregroundColor(.primary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+        }
+        .background(Color(white: 0.92))
     }
 
     // Wall dimensions panel – horizontal scroll of edit buttons for each wall segment
@@ -577,30 +668,105 @@ struct RoomDesignerView: View {
                             let b = points[(i + 1) % points.count]
                             let length = sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2))
                             let roundedLength = Int(length.rounded())
+                            let isWallLocked = lockedCornerIndices.contains(i) || lockedCornerIndices.contains((i + 1) % points.count)
                             Button {
                                 selectedSegmentIndex = i
                                 editingDimension = String(roundedLength)
                                 showDimensionInput = true
                             } label: {
-                                VStack(spacing: 2) {
-                                    Text("W\(i + 1)")
+                                wallDimensionChip(index: i, length: roundedLength, isWallLocked: isWallLocked)
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+            }
+            .background(Color(white: 0.92))
+        }
+    }
+
+    private func wallDimensionChip(index: Int, length: Int, isWallLocked: Bool) -> some View {
+        let isSelected = selectedSegmentIndex == index
+        let chipBackground: Color
+        if isSelected {
+            chipBackground = isWallLocked ? Color.orange.opacity(0.2) : Color.blue.opacity(0.18)
+        } else {
+            chipBackground = isWallLocked ? Color.orange.opacity(0.12) : Color.blue.opacity(0.08)
+        }
+        let strokeColor = isWallLocked ? Color.orange.opacity(0.5) : Color.blue.opacity(0.4)
+
+        return VStack(spacing: 2) {
+            HStack(spacing: 3) {
+                Text("W\(index + 1)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                if isWallLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+            }
+            HStack(spacing: 2) {
+                Text("\(length) mm")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Image(systemName: "pencil")
+                    .font(.caption2)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(chipBackground)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(strokeColor, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var cornerConstraintList: some View {
+        if points.count >= 3 {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Corner Constraints")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("Lock angle/position")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<points.count, id: \.self) { i in
+                            let isLocked = lockedCornerIndices.contains(i)
+                            Button {
+                                toggleCornerLock(i)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text("C\(i + 1)")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
-                                    HStack(spacing: 2) {
-                                        Text("\(roundedLength) mm")
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
-                                        Image(systemName: "pencil")
-                                            .font(.caption2)
-                                    }
+                                    Image(systemName: isLocked ? "lock.fill" : "lock.open")
+                                        .font(.caption)
+                                    Text(isLocked ? "Locked" : "Free")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(selectedSegmentIndex == i ? Color.blue.opacity(0.18) : Color.blue.opacity(0.08))
+                                .background(isLocked ? Color.orange.opacity(0.2) : Color.orange.opacity(0.08))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                                        .stroke(Color.orange.opacity(0.4), lineWidth: 1)
                                 )
                             }
                             .foregroundColor(.primary)
@@ -635,6 +801,25 @@ struct RoomDesignerView: View {
                 Section("New Length (mm)") {
                     TextField("Enter length in mm", text: $editingDimension)
                         .keyboardType(.decimalPad)
+                }
+
+                Section("Edit Behavior") {
+                    Picker("Mode", selection: $dimensionEditMode) {
+                        ForEach(DimensionEditMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if dimensionEditMode == .preserveShape {
+                        Text("Moves downstream corners together so existing angles are preserved. Unlocked final wall is derived.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Moves only one corner. Adjacent angles may change.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .navigationTitle(selectedSegmentIndex.map { "Edit Wall \($0 + 1)" } ?? "Edit Dimension")
@@ -724,49 +909,43 @@ struct RoomDesignerView: View {
 
         // Convert mm to pixels (1mm = 0.1 pixels at scale 1.0)
         let mmToPixels: Double = 0.1 * scale
+        let screenPoints = points.map { point in
+            CGPoint(
+                x: centerX + point.x * mmToPixels,
+                y: centerY + point.y * mmToPixels
+            )
+        }
+        let centroid = polygonCentroid(of: screenPoints)
+        let segmentCount = isClosed ? points.count : max(0, points.count - 1)
 
         // Draw lines between points
         if points.count >= 2 {
-            for i in 0..<points.count {
+            for i in 0..<segmentCount {
                 let start = points[i]
                 let end = points[(i + 1) % points.count]
+                let startPoint = screenPoints[i]
+                let endPoint = screenPoints[(i + 1) % points.count]
+                let isWallLocked = lockedCornerIndices.contains(i) || lockedCornerIndices.contains((i + 1) % points.count)
 
-                let startPoint = CGPoint(
-                    x: centerX + start.x * mmToPixels,
-                    y: centerY + start.y * mmToPixels
+                context.stroke(
+                    Path { path in
+                        path.move(to: startPoint)
+                        path.addLine(to: endPoint)
+                    },
+                    with: .color(isWallLocked ? lockedColor : lineColor),
+                    lineWidth: isWallLocked ? 3.5 : 3
                 )
-                let endPoint = CGPoint(
-                    x: centerX + end.x * mmToPixels,
-                    y: centerY + end.y * mmToPixels
+
+                drawCADDimension(
+                    context: context,
+                    wallIndex: i,
+                    worldStart: start,
+                    worldEnd: end,
+                    startPoint: startPoint,
+                    endPoint: endPoint,
+                    centroid: centroid,
+                    isLocked: isWallLocked
                 )
-
-                // Draw line segment (skip closing segment unless polygon is explicitly closed)
-                if i < points.count - 1 || (isClosed && points.count >= 3 && i == points.count - 1) {
-                    context.stroke(
-                        Path { path in
-                            path.move(to: startPoint)
-                            path.addLine(to: endPoint)
-                        },
-                        with: .color(lineColor),
-                        lineWidth: 3
-                    )
-
-                    // Draw dimension label
-                    let dx = end.x - start.x
-                    let dy = end.y - start.y
-                    let distance = sqrt(dx * dx + dy * dy)
-                    let midPoint = CGPoint(
-                        x: (startPoint.x + endPoint.x) / 2,
-                        y: (startPoint.y + endPoint.y) / 2
-                    )
-
-                    context.draw(
-                        Text("\(Int(distance))mm")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.blue),
-                        at: midPoint
-                    )
-                }
             }
         }
 
@@ -780,7 +959,8 @@ struct RoomDesignerView: View {
             // Highlight the first point in green when 3+ points exist and shape is open,
             // indicating the user can tap it to close the polygon.
             let isCloseTarget = index == 0 && points.count >= 3 && !isClosed
-            let fillColor: Color = isCloseTarget ? .green : pointColor
+            let isLockedCorner = lockedCornerIndices.contains(index)
+            let fillColor: Color = isCloseTarget ? .green : (isLockedCorner ? lockedColor : pointColor)
 
             if isCloseTarget {
                 // Draw a larger ring around the first point as a close-target indicator
@@ -816,6 +996,24 @@ struct RoomDesignerView: View {
                 with: .color(.white),
                 lineWidth: 2
             )
+
+            if isLockedCorner {
+                context.draw(
+                    Text("L")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white),
+                    at: screenPoint
+                )
+            }
+
+            let cornerLabel = isLockedCorner ? "C\(index + 1) [L]" : "C\(index + 1)"
+            context.draw(
+                Text(cornerLabel)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(isLockedCorner ? lockedColor : .secondary),
+                at: CGPoint(x: screenPoint.x + 22, y: screenPoint.y - 14),
+                anchor: .leading
+            )
         }
 
         // Draw current/preview point
@@ -829,7 +1027,121 @@ struct RoomDesignerView: View {
                 )),
                 with: .color(pointColor.opacity(0.5))
             )
+
+            if angleConstraintMode != .free {
+                let indicatorText = "Angle: \(angleConstraintMode.rawValue)"
+                let indicatorOrigin = CGPoint(x: current.x + 14, y: current.y - 26)
+                let indicatorRect = CGRect(x: indicatorOrigin.x - 6, y: indicatorOrigin.y - 4, width: 92, height: 22)
+
+                context.fill(
+                    Path(roundedRect: indicatorRect, cornerRadius: 6),
+                    with: .color(Color.black.opacity(0.75))
+                )
+                context.draw(
+                    Text(indicatorText)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white),
+                    at: indicatorOrigin,
+                    anchor: .topLeading
+                )
+            }
         }
+    }
+
+    private func drawCADDimension(
+        context: GraphicsContext,
+        wallIndex: Int,
+        worldStart: RoomPoint,
+        worldEnd: RoomPoint,
+        startPoint: CGPoint,
+        endPoint: CGPoint,
+        centroid: CGPoint,
+        isLocked: Bool
+    ) {
+        let vx = endPoint.x - startPoint.x
+        let vy = endPoint.y - startPoint.y
+        let screenLength = hypot(vx, vy)
+        guard screenLength > 0.1 else { return }
+
+        let ux = vx / screenLength
+        let uy = vy / screenLength
+
+        var nx = -uy
+        var ny = ux
+
+        let midX = (startPoint.x + endPoint.x) / 2
+        let midY = (startPoint.y + endPoint.y) / 2
+        let toCentroidX = centroid.x - midX
+        let toCentroidY = centroid.y - midY
+        if nx * toCentroidX + ny * toCentroidY > 0 {
+            nx = -nx
+            ny = -ny
+        }
+
+        let levelOffset = dimensionOffsetBase + CGFloat(wallIndex % 4) * dimensionOffsetStep
+        let extensionStart = CGPoint(x: startPoint.x + nx * extensionLeadIn, y: startPoint.y + ny * extensionLeadIn)
+        let extensionEnd = CGPoint(x: endPoint.x + nx * extensionLeadIn, y: endPoint.y + ny * extensionLeadIn)
+        let dimensionStart = CGPoint(x: startPoint.x + nx * levelOffset, y: startPoint.y + ny * levelOffset)
+        let dimensionEnd = CGPoint(x: endPoint.x + nx * levelOffset, y: endPoint.y + ny * levelOffset)
+
+        context.stroke(
+            Path { path in
+                path.move(to: extensionStart)
+                path.addLine(to: dimensionStart)
+            },
+            with: .color(extensionLineColor),
+            lineWidth: 1
+        )
+        context.stroke(
+            Path { path in
+                path.move(to: extensionEnd)
+                path.addLine(to: dimensionEnd)
+            },
+            with: .color(extensionLineColor),
+            lineWidth: 1
+        )
+
+        context.stroke(
+            Path { path in
+                path.move(to: dimensionStart)
+                path.addLine(to: dimensionEnd)
+            },
+            with: .color(isLocked ? lockedColor : dimensionLineColor),
+            lineWidth: 1.5
+        )
+
+        let tickLength: CGFloat = 4
+        context.stroke(
+            Path { path in
+                path.move(to: CGPoint(x: dimensionStart.x - nx * tickLength, y: dimensionStart.y - ny * tickLength))
+                path.addLine(to: CGPoint(x: dimensionStart.x + nx * tickLength, y: dimensionStart.y + ny * tickLength))
+                path.move(to: CGPoint(x: dimensionEnd.x - nx * tickLength, y: dimensionEnd.y - ny * tickLength))
+                path.addLine(to: CGPoint(x: dimensionEnd.x + nx * tickLength, y: dimensionEnd.y + ny * tickLength))
+            },
+            with: .color(isLocked ? lockedColor : dimensionLineColor),
+            lineWidth: 1
+        )
+
+        let distance = hypot(worldEnd.x - worldStart.x, worldEnd.y - worldStart.y)
+        let label = isLocked ? "W\(wallIndex + 1) [L] \(Int(distance.rounded())) mm" : "W\(wallIndex + 1) \(Int(distance.rounded())) mm"
+        let labelPoint = CGPoint(
+            x: (dimensionStart.x + dimensionEnd.x) / 2 + nx * 11,
+            y: (dimensionStart.y + dimensionEnd.y) / 2 + ny * 11
+        )
+        context.draw(
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(isLocked ? lockedColor : .black),
+            at: labelPoint
+        )
+    }
+
+    private func polygonCentroid(of points: [CGPoint]) -> CGPoint {
+        guard !points.isEmpty else { return .zero }
+        let sum = points.reduce(CGPoint.zero) { partial, point in
+            CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+        }
+        return CGPoint(x: sum.x / CGFloat(points.count), y: sum.y / CGFloat(points.count))
     }
 
     private func handleTap(at location: CGPoint, in size: CGSize) {
@@ -882,18 +1194,119 @@ struct RoomDesignerView: View {
         if isClosed { return }
 
         // Add point
-        let newPoint = RoomPoint(x: snappedX, y: snappedY)
+        var newPoint = RoomPoint(x: snappedX, y: snappedY)
+
+        if let anchor = points.last {
+            newPoint = applyAngleConstraint(from: anchor, to: newPoint)
+        }
 
         // Check if point is too close to existing points
         let tooClose = points.contains { point in
-            let dx = point.x - snappedX
-            let dy = point.y - snappedY
+            let dx = point.x - newPoint.x
+            let dy = point.y - newPoint.y
             return sqrt(dx * dx + dy * dy) < gridSize / 4
         }
 
         if !tooClose {
             points.append(newPoint)
+            currentPoint = location
+            clearCurrentPointIndicator(after: 0.65)
         }
+    }
+
+    private func handleCanvasDragChanged(value: DragGesture.Value, in size: CGSize) {
+        if showDimensionInput { return }
+
+        if draggedPointIndex == nil, let hitIndex = findPointNearScreenLocation(value.startLocation, in: size) {
+            draggedPointIndex = hitIndex
+        }
+
+        if let movingIndex = draggedPointIndex, points.indices.contains(movingIndex) {
+            let rawPoint = pointFromScreenLocation(value.location, in: size)
+            var adjustedPoint = rawPoint
+
+            if let anchor = anchorPoint(for: movingIndex) {
+                adjustedPoint = applyAngleConstraint(from: anchor, to: rawPoint)
+            }
+
+            points[movingIndex] = adjustedPoint
+            currentPoint = value.location
+        } else {
+            currentPoint = nil
+            offset = CGSize(
+                width: lastOffset.width + value.translation.width,
+                height: lastOffset.height + value.translation.height
+            )
+        }
+    }
+
+    private func handleCanvasDragEnded() {
+        draggedPointIndex = nil
+        currentPoint = nil
+        lastOffset = offset
+    }
+
+    private func findPointNearScreenLocation(_ location: CGPoint, in size: CGSize) -> Int? {
+        guard !points.isEmpty else { return nil }
+        let centerX = size.width / 2 + offset.width
+        let centerY = size.height / 2 + offset.height
+        let mmToPixels: Double = 0.1 * scale
+        let hitRadius: CGFloat = 18
+
+        var nearestIndex: Int?
+        var nearestDistance = CGFloat.infinity
+
+        for (index, point) in points.enumerated() {
+            let screenPoint = CGPoint(
+                x: centerX + point.x * mmToPixels,
+                y: centerY + point.y * mmToPixels
+            )
+            let distance = hypot(location.x - screenPoint.x, location.y - screenPoint.y)
+            if distance < hitRadius && distance < nearestDistance {
+                nearestDistance = distance
+                nearestIndex = index
+            }
+        }
+
+        return nearestIndex
+    }
+
+    private func pointFromScreenLocation(_ location: CGPoint, in size: CGSize) -> RoomPoint {
+        let centerX = size.width / 2 + offset.width
+        let centerY = size.height / 2 + offset.height
+        let mmToPixels: Double = 0.1 * scale
+        let x = (location.x - centerX) / mmToPixels
+        let y = (location.y - centerY) / mmToPixels
+        return RoomPoint(x: x, y: y)
+    }
+
+    private func anchorPoint(for movingIndex: Int) -> RoomPoint? {
+        if movingIndex > 0 {
+            return points[movingIndex - 1]
+        }
+        if isClosed && points.count > 1 {
+            return points[points.count - 1]
+        }
+        return nil
+    }
+
+    private func applyAngleConstraint(from anchor: RoomPoint, to candidate: RoomPoint) -> RoomPoint {
+        guard let angleDegrees = angleConstraintMode.angleDegrees else {
+            return candidate
+        }
+
+        let theta = angleDegrees * .pi / 180.0
+        let dirX = cos(theta)
+        let dirY = sin(theta)
+
+        let vx = candidate.x - anchor.x
+        let vy = candidate.y - anchor.y
+        let projection = vx * dirX + vy * dirY
+
+        return RoomPoint(
+            x: anchor.x + projection * dirX,
+            y: anchor.y + projection * dirY
+        )
     }
 
     private func undoLastPoint() {
@@ -905,6 +1318,7 @@ struct RoomDesignerView: View {
 
     private func clearAll() {
         points.removeAll()
+        lockedCornerIndices.removeAll()
         scale = 1.0
         offset = .zero
         lastOffset = .zero
@@ -918,16 +1332,23 @@ struct RoomDesignerView: View {
     }
 
     private func applyDimension() {
-        guard let idx = selectedSegmentIndex,
-              let newLen = Double(editingDimension),
+        guard points.count >= 2,
+              let idx = selectedSegmentIndex,
               points.indices.contains(idx),
-              points.indices.contains((idx + 1) % points.count) else {
+              let newLen = Double(editingDimension),
+              newLen > 0 else {
+            showDimensionInput = false
+            return
+        }
+
+        let nextIndex = (idx + 1) % points.count
+        guard points.indices.contains(nextIndex) else {
             showDimensionInput = false
             return
         }
 
         let a = points[idx]
-        let b = points[(idx + 1) % points.count]
+        let b = points[nextIndex]
 
         let dx = b.x - a.x
         let dy = b.y - a.y
@@ -937,9 +1358,43 @@ struct RoomDesignerView: View {
             return
         }
 
-        let scale = newLen / currentLen
-        let newB = RoomPoint(x: a.x + dx * scale, y: a.y + dy * scale)
-        points[(idx + 1) % points.count] = newB
+        let lengthScale = newLen / currentLen
+        let newB = RoomPoint(x: a.x + dx * lengthScale, y: a.y + dy * lengthScale)
+        let deltaX = newB.x - b.x
+        let deltaY = newB.y - b.y
+
+        switch dimensionEditMode {
+        case .moveSingleCorner:
+            if lockedCornerIndices.contains(nextIndex) {
+                showConstraintError("Corner C\(nextIndex + 1) is locked.")
+                return
+            }
+            points[nextIndex] = newB
+
+        case .preserveShape:
+            var updatedPoints = points
+            var indicesToMove: [Int] = [nextIndex]
+
+            if isClosed {
+                if nextIndex < points.count - 1 {
+                    indicesToMove.append(contentsOf: (nextIndex + 1)..<points.count)
+                }
+            } else if nextIndex < points.count - 1 {
+                indicesToMove.append(contentsOf: (nextIndex + 1)..<points.count)
+            }
+
+            if let lockedIndex = indicesToMove.first(where: { lockedCornerIndices.contains($0) }) {
+                showConstraintError("Corner C\(lockedIndex + 1) is locked. Unlock it or use Move One Corner.")
+                return
+            }
+
+            for moveIndex in indicesToMove {
+                let point = updatedPoints[moveIndex]
+                updatedPoints[moveIndex] = RoomPoint(x: point.x + deltaX, y: point.y + deltaY)
+            }
+
+            points = updatedPoints
+        }
 
         showDimensionInput = false
     }
@@ -989,5 +1444,51 @@ struct RoomDesignerView: View {
         let proj = CGPoint(x: a.x + ab.x * t, y: a.y + ab.y * t)
         return hypot(p.x - proj.x, p.y - proj.y)
     }
+
+    private func toggleCornerLock(_ index: Int) {
+        if lockedCornerIndices.contains(index) {
+            lockedCornerIndices.remove(index)
+        } else {
+            lockedCornerIndices.insert(index)
+        }
+    }
+
+    private func showConstraintError(_ message: String) {
+        dimensionEditErrorMessage = message
+        showDimensionInput = false
+        showDimensionEditError = true
+    }
+
+    private func clearCurrentPointIndicator(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            self.currentPoint = nil
+        }
+    }
 }
 
+#Preview("Room Settings · Rectangular") {
+    PreviewHost(
+        title: "Room Settings",
+        appState: PreviewFactory.appState(materialType: .laminate, shape: .rectangular)
+    ) {
+        RoomSettingsView()
+    }
+}
+
+#Preview("Room Settings · Polygon") {
+    PreviewHost(
+        title: "Room Settings",
+        appState: PreviewFactory.appState(materialType: .laminate, shape: .polygon)
+    ) {
+        RoomSettingsView()
+    }
+}
+
+#Preview("Room Designer · Polygon CAD") {
+    PreviewHost(
+        title: "Room Designer",
+        appState: PreviewFactory.appState(materialType: .laminate, shape: .polygon)
+    ) {
+        RoomDesignerView(initialPoints: PreviewFactory.samplePolygonPoints)
+    }
+}

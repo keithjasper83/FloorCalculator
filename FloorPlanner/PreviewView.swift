@@ -436,3 +436,21 @@ extension PreviewView {
     }
 }
 #endif
+
+#Preview("Layout Preview · Laminate") {
+    PreviewHost(
+        title: "Preview",
+        appState: PreviewFactory.appState(materialType: .laminate, includeLayout: true)
+    ) {
+        PreviewView()
+    }
+}
+
+#Preview("Layout Preview · Polygon Tile") {
+    PreviewHost(
+        title: "Preview",
+        appState: PreviewFactory.appState(materialType: .ceramicTile, shape: .polygon, includeLayout: true)
+    ) {
+        PreviewView()
+    }
+}

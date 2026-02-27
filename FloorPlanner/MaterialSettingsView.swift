@@ -234,3 +234,30 @@ struct MaterialSettingsView: View {
         )
     }
 }
+
+#Preview("Material Settings · Laminate") {
+    PreviewHost(
+        title: "Material Settings",
+        appState: PreviewFactory.appState(materialType: .laminate)
+    ) {
+        MaterialSettingsView()
+    }
+}
+
+#Preview("Material Settings · Tile") {
+    PreviewHost(
+        title: "Material Settings",
+        appState: PreviewFactory.appState(materialType: .ceramicTile)
+    ) {
+        MaterialSettingsView()
+    }
+}
+
+#Preview("Material Settings · Continuous") {
+    PreviewHost(
+        title: "Material Settings",
+        appState: PreviewFactory.appState(materialType: .paint)
+    ) {
+        MaterialSettingsView()
+    }
+}

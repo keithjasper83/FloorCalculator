@@ -159,3 +159,21 @@ struct MaterialPickerView: View {
         }
     }
 }
+
+#Preview("Material Picker · Flooring") {
+    PreviewHost(
+        title: "Select Material",
+        appState: PreviewFactory.appState(materialType: .laminate)
+    ) {
+        MaterialPickerView()
+    }
+}
+
+#Preview("Material Picker · Continuous") {
+    PreviewHost(
+        title: "Select Material",
+        appState: PreviewFactory.appState(materialType: .concrete)
+    ) {
+        MaterialPickerView()
+    }
+}

@@ -120,3 +120,21 @@ struct AddStockItemView: View {
         dismiss()
     }
 }
+
+#Preview("Stock Table · With Items") {
+    PreviewHost(
+        title: "Stock Items",
+        appState: PreviewFactory.appState(materialType: .laminate)
+    ) {
+        StockTableView()
+    }
+}
+
+#Preview("Add Stock Item") {
+    PreviewHost(
+        title: "Add Stock Item",
+        appState: PreviewFactory.appState(materialType: .laminate)
+    ) {
+        AddStockItemView()
+    }
+}
