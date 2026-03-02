@@ -41,23 +41,25 @@ struct MaterialPickerView: View {
                     .padding(.horizontal)
                 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        ForEach(categoryOrder, id: \.self) { category in
-                            if let types = categories[category.rawValue], !types.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text(category.rawValue)
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
-                                        .padding(.leading, 4)
+                    GlassEffectContainer(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            ForEach(categoryOrder, id: \.self) { category in
+                                if let types = categories[category.rawValue], !types.isEmpty {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Text(category.rawValue)
+                                            .font(.headline)
+                                            .foregroundColor(.secondary)
+                                            .padding(.leading, 4)
 
-                                    ForEach(types, id: \.self) { type in
-                                        materialTypeButton(type)
+                                        ForEach(types, id: \.self) { type in
+                                            materialTypeButton(type)
+                                        }
                                     }
                                 }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
                 
                 if !appState.isFirstLaunch {
@@ -132,13 +134,11 @@ struct MaterialPickerView: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(selectedType == type ? Color.accentColor.opacity(0.1) : Color.secondary.opacity(0.1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(selectedType == type ? Color.accentColor : Color.clear, lineWidth: 2)
+            .glassEffect(
+                selectedType == type
+                    ? .regular.tint(Color.accentColor.opacity(0.15)).interactive()
+                    : .regular,
+                in: .rect(cornerRadius: 8)
             )
         }
         .buttonStyle(.plain)
