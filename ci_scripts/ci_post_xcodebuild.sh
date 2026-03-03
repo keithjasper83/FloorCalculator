@@ -31,7 +31,7 @@ log() { echo "[ci_post_xcodebuild] $*"; }
 
 if [ -z "${MCP_SERVER_URL:-}" ]; then
     MCP_SERVER_URL="https://relay.Jarvis.kjdev.uk"
-    log "MCP_SERVER_URL not set – using default: $MCP_SERVER_URL"
+    log "MCP_SERVER_URL not set – using default."
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -44,7 +44,7 @@ if ! command -v curl >/dev/null 2>&1; then
     exit 0
 fi
 
-log "MCP server: $MCP_SERVER_URL"
+log "MCP server is configured."
 log "Project   : ${CI_XCODE_PROJECT:-unknown}"
 log "Scheme    : ${CI_SCHEME:-unknown}"
 log "Config    : ${CI_CONFIGURATION:-unknown}"
@@ -170,7 +170,7 @@ if [ -n "${MCP_API_KEY:-}" ]; then
     AUTH_HEADER="Authorization: Bearer $MCP_API_KEY"
 fi
 
-log "Posting artifacts to $INGEST_ENDPOINT …"
+log "Posting artifacts to MCP server …"
 
 RESPONSE_FILE=$(mktemp "/tmp/mcp_ingest_${CI_BUILD_ID:-$$}_XXXXXX.json")
 
