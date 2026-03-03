@@ -83,6 +83,7 @@ struct PreviewView: View {
                     }
                 }
                 .padding()
+                .glassEffect(.regular, in: .rect(cornerRadius: 12))
             } else {
                 Text("No layout generated")
                     .foregroundColor(.secondary)
@@ -352,10 +353,7 @@ struct LayoutLegendView: View {
             }
         }
         .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.regularMaterial)
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
     }
 }
 
