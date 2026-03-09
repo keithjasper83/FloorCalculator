@@ -195,6 +195,48 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertTrue(csv.contains("S1"))
         XCTAssertTrue(csv.contains("1000"))
     }
+
+    func testCutListCSVExportLaminate() {
+        let result = LayoutResult(
+            placedPieces: [],
+            cutRecords: [
+                CutRecord(materialType: .laminate, row: 1, cutType: .startCut, fromLengthMm: 2400, cutToMm: 1000, offcutLengthMm: 1400, widthMm: 300)
+            ],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+
+        let csv = PersistenceManager.shared.exportCutListCSV(result: result, materialType: .laminate)
+
+        XCTAssertTrue(csv.contains("Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)"))
+        XCTAssertTrue(csv.contains("1,Start Cut,2400.0,1000.0,1400.0,300.0"))
+    }
+
+    func testCutListCSVExportTile() {
+        let result = LayoutResult(
+            placedPieces: [],
+            cutRecords: [
+                CutRecord(materialType: .ceramicTile, edgeCutCount: 2, cutDimensionsMm: "150x300")
+            ],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+
+        let csv = PersistenceManager.shared.exportCutListCSV(result: result, materialType: .ceramicTile)
+
+        XCTAssertTrue(csv.contains("EdgeCutCount,Dimensions"))
+        XCTAssertTrue(csv.contains("2,\"150x300\""))
+    }
     
     // MARK: - Polygon Room Tests
     
