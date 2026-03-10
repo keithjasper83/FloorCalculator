@@ -99,6 +99,7 @@ A complete, production-ready universal SwiftUI application for planning floor in
 - [x] Zoom and pan gestures
 - [x] Legend overlay
 - [x] Fit to view control
+- [x] Image export (PNG) via iOS ShareSheet/macOS Save Panel
 
 ### Reports ✅
 - [x] Area summary (6 metrics)
@@ -199,8 +200,6 @@ See [BUILDING.md](./BUILDING.md) for:
 ## Known Limitations & Future Enhancements
 
 ### Not Yet Implemented
-- [ ] PNG export actual implementation (placeholder exists)
-- [ ] ShareSheet/NSSavePanel UI integration (core logic ready)
 - [ ] Multiple rooms / complex shapes
 - [ ] Undo/redo functionality
 - [ ] Project browser (currently loads last project)
@@ -320,7 +319,7 @@ All requirements from the problem statement have been addressed:
 13. ✅ Over/short reporting
 14. ✅ Adaptive UI by platform
 15. ✅ Preview with zoom/pan
-16. ✅ Export functionality (CSV + PNG placeholder)
+16. ✅ Export functionality (CSV + PNG implemented)
 17. ✅ Persistence (JSON)
 18. ✅ Sample data preloaded
 19. ✅ Unit tests
