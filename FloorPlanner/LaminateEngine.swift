@@ -27,26 +27,31 @@ class LaminateEngine: LayoutEngine {
         // Determine primary width (used as fallback for "needed" pieces)
         let primaryWidth = determinePrimaryWidth(stockItems: project.stockItems, settings: settings)
         
-        // Collect ALL available pieces including narrow boards
-        var availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)] = []
+        // Group stock pieces by width for O(1) access
+        var availableByWidth: [Double: [(length: Double, price: Double?)]] = [:]
+        var nextStockIndexByWidth: [Double: Int] = [:]
         
         if useStock && !project.stockItems.isEmpty {
             for item in project.stockItems {
+                let piece = (length: item.lengthMm, price: item.pricePerUnit)
                 for _ in 0..<item.quantity {
-                    availablePieces.append((item.lengthMm, item.widthMm, .stock, item.pricePerUnit))
+                    availableByWidth[item.widthMm, default: []].append(piece)
                 }
             }
-        }
-        
-        // Sort by width descending then length descending so wider/longer boards are preferred
-        availablePieces.sort {
-            if abs($0.width - $1.width) > Constants.geometryToleranceMm { return $0.width > $1.width }
-            return $0.length > $1.length
+
+            // Sort each width group by length descending
+            for width in availableByWidth.keys {
+                if var pieces = availableByWidth[width] {
+                    pieces.sort { $0.length > $1.length }
+                    availableByWidth[width] = pieces
+                }
+                nextStockIndexByWidth[width] = 0
+            }
         }
         
         var placedPieces: [PlacedPiece] = []
         var cutRecords: [CutRecord] = []
-        var offcuts: [(length: Double, width: Double)] = []
+        var offcutsByWidth: [Double: [Double]] = [:]
         var usedStockCost = 0.0
         
         // Determine direction: roomDepth is the dimension we stack rows across
@@ -63,12 +68,17 @@ class LaminateEngine: LayoutEngine {
 
             // Pick the widest board width available that fits the remaining depth.
             // Falls back to defaultPlankWidthMm (capped at remaining) when no stock is left.
-            let rowWidth = largestFittingWidth(
+            // We get both the original width (for lookups) and the ripped width (for layout).
+            let widthResult = largestFittingWidth(
                 remaining: remaining,
-                availablePieces: availablePieces,
-                offcuts: offcuts,
+                availableByWidth: availableByWidth,
+                nextStockIndexByWidth: nextStockIndexByWidth,
+                offcutsByWidth: offcutsByWidth,
                 defaultWidth: primaryWidth
             )
+
+            let originalWidth = widthResult.original
+            let rowWidth = widthResult.ripped
 
             if rowWidth < Constants.snapToleranceMm { break }
 
@@ -112,25 +122,29 @@ class LaminateEngine: LayoutEngine {
                     }
 
                     // Try to find a piece matching rowWidth and long enough
-                    var pieceIndex = -1
                     var selectedPiece: (length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)?
+                    var selectedOffcutIndex: Int?
 
-                    // First try offcuts (must match rowWidth)
-                    for (index, offcut) in offcuts.enumerated() {
-                        if abs(offcut.width - rowWidth) < Constants.geometryToleranceMm && offcut.length >= targetLength {
-                            pieceIndex = -1000 - index
-                            selectedPiece = (offcut.length, offcut.width, .offcut, nil)
-                            break
+                    // First try offcuts (must match originalWidth)
+                    if let offcutsForWidth = offcutsByWidth[originalWidth] {
+                        for (index, offcutLength) in offcutsForWidth.enumerated() {
+                            if offcutLength >= targetLength {
+                                selectedOffcutIndex = index
+                                selectedPiece = (offcutLength, originalWidth, .offcut, nil)
+                                break
+                            }
                         }
                     }
                     
-                    // Then try available stock (must match rowWidth)
+                    // Then try available stock (must match originalWidth)
                     if selectedPiece == nil {
-                        for (index, piece) in availablePieces.enumerated() {
-                            if abs(piece.width - rowWidth) < Constants.geometryToleranceMm && piece.length >= targetLength {
-                                pieceIndex = index
-                                selectedPiece = piece
-                                break
+                        if let pieces = availableByWidth[originalWidth] {
+                            let nextIdx = nextStockIndexByWidth[originalWidth, default: 0]
+                            if nextIdx < pieces.count {
+                                let piece = pieces[nextIdx]
+                                if piece.length >= targetLength {
+                                    selectedPiece = (piece.length, originalWidth, .stock, piece.price)
+                                }
                             }
                         }
                     }
@@ -154,14 +168,13 @@ class LaminateEngine: LayoutEngine {
                     }
 
                     // Remove piece from available or offcuts
-                    if pieceIndex >= 0 {
-                        availablePieces.remove(at: pieceIndex)
+                    if let offcutIdx = selectedOffcutIndex {
+                        offcutsByWidth[originalWidth]?.remove(at: offcutIdx)
+                    } else if piece.source == .stock {
+                        nextStockIndexByWidth[originalWidth, default: 0] += 1
                         if let price = piece.price {
                             usedStockCost += price
                         }
-                    } else {
-                        let offcutIndex = -pieceIndex - 1000
-                        offcuts.remove(at: offcutIndex)
                     }
 
                     // Cut logic
@@ -175,7 +188,7 @@ class LaminateEngine: LayoutEngine {
                     if piece.length > targetLength + Constants.snapToleranceMm { // Tolerance
                         let offcutLength = piece.length - targetLength
                         if offcutLength >= settings.minOffcutLengthMm {
-                            offcuts.append((offcutLength, piece.width))
+                            offcutsByWidth[piece.width, default: []].append(offcutLength)
                         }
                         
                         cutRecords.append(CutRecord(
@@ -212,20 +225,28 @@ class LaminateEngine: LayoutEngine {
         
         // Build remaining pieces list
         var remainingPieces: [RemainingPiece] = []
-        for piece in availablePieces {
-            remainingPieces.append(RemainingPiece(
-                lengthMm: piece.length,
-                widthMm: piece.width,
-                source: piece.source
-            ))
+        for (width, pieces) in availableByWidth {
+            let nextIdx = nextStockIndexByWidth[width, default: 0]
+            if nextIdx < pieces.count {
+                for i in nextIdx..<pieces.count {
+                    let piece = pieces[i]
+                    remainingPieces.append(RemainingPiece(
+                        lengthMm: piece.length,
+                        widthMm: width,
+                        source: .stock
+                    ))
+                }
+            }
         }
-        for offcut in offcuts {
-            if offcut.length >= settings.minOffcutLengthMm {
-                remainingPieces.append(RemainingPiece(
-                    lengthMm: offcut.length,
-                    widthMm: offcut.width,
-                    source: .offcut
-                ))
+        for (width, lengths) in offcutsByWidth {
+            for length in lengths {
+                if length >= settings.minOffcutLengthMm {
+                    remainingPieces.append(RemainingPiece(
+                        lengthMm: length,
+                        widthMm: width,
+                        source: .offcut
+                    ))
+                }
             }
         }
         
@@ -293,29 +314,41 @@ class LaminateEngine: LayoutEngine {
     }
     
     /// Returns the largest board width available in stock/offcuts that fits within `remaining`.
-    /// Falls back to `min(defaultWidth, remaining)` when no stock is available.
+    /// Returns both the original width (for lookups) and the ripped width (capped at `remaining`).
+    /// Falls back to `primaryWidth` when no stock is available.
     private func largestFittingWidth(
         remaining: Double,
-        availablePieces: [(length: Double, width: Double, source: PlacedPiece.PieceSource, price: Double?)],
-        offcuts: [(length: Double, width: Double)],
+        availableByWidth: [Double: [(length: Double, price: Double?)]],
+        nextStockIndexByWidth: [Double: Int],
+        offcutsByWidth: [Double: [Double]],
         defaultWidth: Double
-    ) -> Double {
+    ) -> (original: Double, ripped: Double) {
         var maxFitting = 0.0
-        for piece in availablePieces {
-            if piece.width <= remaining + Constants.geometryToleranceMm && piece.width > maxFitting {
-                maxFitting = piece.width
+
+        // Check stock widths
+        for (width, pieces) in availableByWidth {
+            let nextIdx = nextStockIndexByWidth[width, default: 0]
+            if nextIdx < pieces.count {
+                if width <= remaining + Constants.geometryToleranceMm && width > maxFitting {
+                    maxFitting = width
+                }
             }
         }
-        for offcut in offcuts {
-            if offcut.width <= remaining + Constants.geometryToleranceMm && offcut.width > maxFitting {
-                maxFitting = offcut.width
+
+        // Check offcut widths
+        for (width, lengths) in offcutsByWidth {
+            if !lengths.isEmpty {
+                if width <= remaining + Constants.geometryToleranceMm && width > maxFitting {
+                    maxFitting = width
+                }
             }
         }
+
         if maxFitting > Constants.geometryToleranceMm {
-            return min(maxFitting, remaining)
+            return (original: maxFitting, ripped: min(maxFitting, remaining))
         }
         // No stock available; use default width (capped at remaining space)
-        return min(defaultWidth, remaining)
+        return (original: defaultWidth, ripped: min(defaultWidth, remaining))
     }
 
     // Helper to find valid segments for a row in a polygon room
