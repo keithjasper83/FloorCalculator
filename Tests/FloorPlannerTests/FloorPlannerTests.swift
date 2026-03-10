@@ -169,6 +169,76 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertTrue(csv.contains("1000"))
     }
     
+    func testExportCutListCSV() {
+        // 1. Test Laminate
+        let laminateResult = LayoutResult(
+            placedPieces: [],
+            cutRecords: [
+                CutRecord(
+                    materialType: .laminate,
+                    row: 1,
+                    cutType: .startCut,
+                    fromLengthMm: 1200,
+                    cutToMm: 800,
+                    offcutLengthMm: 400,
+                    widthMm: 190
+                )
+            ],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+
+        let laminateCsv = PersistenceManager.shared.exportCutListCSV(result: laminateResult, materialType: .laminate)
+
+        XCTAssertTrue(laminateCsv.contains("Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)"))
+        XCTAssertTrue(laminateCsv.contains("1,Start Cut,1200.0,800.0,400.0,190.0"))
+
+        // 2. Test Tile
+        let tileResult = LayoutResult(
+            placedPieces: [],
+            cutRecords: [
+                CutRecord(
+                    materialType: .ceramicTile,
+                    edgeCutCount: 2,
+                    cutDimensionsMm: "150x300"
+                )
+            ],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+
+        let tileCsv = PersistenceManager.shared.exportCutListCSV(result: tileResult, materialType: .ceramicTile)
+
+        XCTAssertTrue(tileCsv.contains("EdgeCutCount,Dimensions"))
+        XCTAssertTrue(tileCsv.contains("2,\"150x300\""))
+
+        // 3. Test Empty
+        let emptyResult = LayoutResult(
+            placedPieces: [],
+            cutRecords: [],
+            remainingPieces: [],
+            purchaseSuggestions: [],
+            installedAreaM2: 0,
+            neededAreaM2: 0,
+            wasteAreaM2: 0,
+            surplusAreaM2: 0,
+            totalCost: 0
+        )
+
+        let emptyCsv = PersistenceManager.shared.exportCutListCSV(result: emptyResult, materialType: .laminate)
+        XCTAssertEqual(emptyCsv, "Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)\n")
+    }
+
     // MARK: - Polygon Room Tests
     
     func testPolygonRoomArea() {
