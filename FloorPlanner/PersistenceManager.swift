@@ -367,71 +367,43 @@ class PersistenceManager: ObservableObject {
     // MARK: - Export
     
     func exportPlacementCSV(result: LayoutResult) -> String {
-        var csv = "Label,X(mm),Y(mm),Length(mm),Width(mm),Source,Status,Rotation\n"
-        
-        for piece in result.placedPieces {
-            csv += "\(piece.label),"
-            csv += "\(piece.x),"
-            csv += "\(piece.y),"
-            csv += "\(piece.lengthMm),"
-            csv += "\(piece.widthMm),"
-            csv += "\(piece.source.rawValue),"
-            csv += "\(piece.status.rawValue),"
-            csv += "\(piece.rotation)\n"
+        let header = "Label,X(mm),Y(mm),Length(mm),Width(mm),Source,Status,Rotation"
+        let rows = result.placedPieces.map { piece in
+            "\(piece.label),\(piece.x),\(piece.y),\(piece.lengthMm),\(piece.widthMm),\(piece.source.rawValue),\(piece.status.rawValue),\(piece.rotation)"
         }
-        
-        return csv
+        return ([header] + rows).joined(separator: "\n") + "\n"
     }
     
     func exportCutListCSV(result: LayoutResult, materialType: MaterialType) -> String {
         if materialType == .laminate {
-            var csv = "Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)\n"
-            
-            for cut in result.cutRecords {
-                csv += "\(cut.row ?? 0),"
-                csv += "\(cut.cutType?.rawValue ?? ""),"
-                csv += "\(cut.fromLengthMm ?? 0),"
-                csv += "\(cut.cutToMm ?? 0),"
-                csv += "\(cut.offcutLengthMm ?? 0),"
-                csv += "\(cut.widthMm ?? 0)\n"
+            let header = "Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)"
+            let rows = result.cutRecords.map { cut in
+                "\(cut.row ?? 0),\(cut.cutType?.rawValue ?? ""),\(cut.fromLengthMm ?? 0),\(cut.cutToMm ?? 0),\(cut.offcutLengthMm ?? 0),\(cut.widthMm ?? 0)"
             }
-            
-            return csv
+            return ([header] + rows).joined(separator: "\n") + "\n"
         } else {
-            var csv = "EdgeCutCount,Dimensions\n"
-            
-            for cut in result.cutRecords {
-                csv += "\(cut.edgeCutCount ?? 0),"
-                csv += "\"\(cut.cutDimensionsMm ?? "")\"\n"
+            let header = "EdgeCutCount,Dimensions"
+            let rows = result.cutRecords.map { cut in
+                "\(cut.edgeCutCount ?? 0),\"\(cut.cutDimensionsMm ?? "")\""
             }
-            
-            return csv
+            return ([header] + rows).joined(separator: "\n") + "\n"
         }
     }
     
     func exportRemainingInventoryCSV(result: LayoutResult) -> String {
-        var csv = "Length(mm),Width(mm),Source\n"
-        
-        for piece in result.remainingPieces {
-            csv += "\(piece.lengthMm),"
-            csv += "\(piece.widthMm),"
-            csv += "\(piece.source.rawValue)\n"
+        let header = "Length(mm),Width(mm),Source"
+        let rows = result.remainingPieces.map { piece in
+            "\(piece.lengthMm),\(piece.widthMm),\(piece.source.rawValue)"
         }
-        
-        return csv
+        return ([header] + rows).joined(separator: "\n") + "\n"
     }
     
     func exportPurchaseListCSV(result: LayoutResult) -> String {
-        var csv = "UnitLength(mm),UnitWidth(mm),Quantity,Packs\n"
-        
-        for suggestion in result.purchaseSuggestions {
-            csv += "\(suggestion.unitLengthMm),"
-            csv += "\(suggestion.unitWidthMm),"
-            csv += "\(suggestion.quantityNeeded),"
-            csv += "\(suggestion.packsNeeded ?? 0)\n"
+        let header = "UnitLength(mm),UnitWidth(mm),Quantity,Packs"
+        let rows = result.purchaseSuggestions.map { suggestion in
+            "\(suggestion.unitLengthMm),\(suggestion.unitWidthMm),\(suggestion.quantityNeeded),\(suggestion.packsNeeded ?? 0)"
         }
-        
-        return csv
+        return ([header] + rows).joined(separator: "\n") + "\n"
     }
 }
 #else
@@ -441,12 +413,27 @@ class PersistenceManager {
     private init() {}
 
     func exportPlacementCSV(result: LayoutResult) -> String {
-        var csv = "Label,X(mm),Y(mm),Length(mm),Width(mm),Source,Status,Rotation\n"
-        for piece in result.placedPieces {
-            csv += "\(piece.label),\(piece.x),\(piece.y),\(piece.lengthMm),\(piece.widthMm),"
-            csv += "\(piece.source.rawValue),\(piece.status.rawValue),\(piece.rotation)\n"
+        let header = "Label,X(mm),Y(mm),Length(mm),Width(mm),Source,Status,Rotation"
+        let rows = result.placedPieces.map { piece in
+            "\(piece.label),\(piece.x),\(piece.y),\(piece.lengthMm),\(piece.widthMm),\(piece.source.rawValue),\(piece.status.rawValue),\(piece.rotation)"
         }
-        return csv
+        return ([header] + rows).joined(separator: "\n") + "\n"
+    }
+
+    func exportCutListCSV(result: LayoutResult, materialType: MaterialType) -> String {
+        if materialType == .laminate {
+            let header = "Row,CutType,FromLength(mm),CutTo(mm),Offcut(mm),Width(mm)"
+            let rows = result.cutRecords.map { cut in
+                "\(cut.row ?? 0),\(cut.cutType?.rawValue ?? ""),\(cut.fromLengthMm ?? 0),\(cut.cutToMm ?? 0),\(cut.offcutLengthMm ?? 0),\(cut.widthMm ?? 0)"
+            }
+            return ([header] + rows).joined(separator: "\n") + "\n"
+        } else {
+            let header = "EdgeCutCount,Dimensions"
+            let rows = result.cutRecords.map { cut in
+                "\(cut.edgeCutCount ?? 0),\"\(cut.cutDimensionsMm ?? "")\""
+            }
+            return ([header] + rows).joined(separator: "\n") + "\n"
+        }
     }
 
     func saveProject(_ project: Project) throws {}
