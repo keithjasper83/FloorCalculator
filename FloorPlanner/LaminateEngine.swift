@@ -242,7 +242,7 @@ class LaminateEngine: LayoutEngine {
         var purchaseCost = 0.0
 
         if neededAreaM2 > 0 {
-            let neededCount = placedPieces.filter { $0.status == .needed }.count
+            let neededCount = placedPieces.lazy.filter { $0.status == .needed }.count
             if neededCount > 0 {
                 var estimatedCost: Double?
                 if let defaultPrice = settings.defaultPricePerPlank {
