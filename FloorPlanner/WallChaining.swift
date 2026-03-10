@@ -38,7 +38,7 @@ internal func chainWallSegments(
     remaining.removeFirst()
 
     while !remaining.isEmpty {
-        let tip = chain.last!
+        guard let tip = chain.last else { break }
         var bestIndex = -1
         var bestDist = tolerance
         // true  → seg.0 matched tip, so add seg.1 as next vertex
@@ -63,7 +63,7 @@ internal func chainWallSegments(
     }
 
     // Drop the closing vertex if it matches the first (polygon is implicitly closed).
-    if chain.count > 1 && hypot(chain[0].x - chain.last!.x, chain[0].y - chain.last!.y) <= tolerance {
+    if chain.count > 1, let last = chain.last, hypot(chain[0].x - last.x, chain[0].y - last.y) <= tolerance {
         chain.removeLast()
     }
 
