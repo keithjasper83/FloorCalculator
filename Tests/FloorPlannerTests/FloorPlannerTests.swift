@@ -93,6 +93,78 @@ final class FloorPlannerTests: XCTestCase {
         // Should have purchase suggestions
         XCTAssertGreaterThan(result.purchaseSuggestions.count, 0)
     }
+
+    func testLaminateEngineWithPolygonRoom() {
+        // L-shaped room: 6m x 4m minus a 2m x 2m corner
+        // Points: (0,0), (6000,0), (6000,4000), (2000,4000), (2000,2000), (0,2000)
+        // Area: (6x2) + (4x2) = 12 + 8 = 20 m^2
+        let lShapePoints = [
+            RoomPoint(x: 0, y: 0),
+            RoomPoint(x: 6000, y: 0),
+            RoomPoint(x: 6000, y: 4000),
+            RoomPoint(x: 2000, y: 4000),
+            RoomPoint(x: 2000, y: 2000),
+            RoomPoint(x: 0, y: 2000)
+        ]
+
+        var project = Project(
+            name: "L-Shape Polygon Test",
+            materialType: .laminate,
+            roomSettings: RoomSettings(
+                lengthMm: 6000,
+                widthMm: 4000,
+                expansionGapMm: 0, // 0 gap for simpler math
+                shape: .polygon,
+                polygonPoints: lShapePoints
+            ),
+            stockItems: [], // Use needed pieces
+            wasteFactor: 0.0
+        )
+
+        // Settings: 1000x300 planks, along length
+        project.laminateSettings = LaminateSettings(
+            minStaggerMm: 200,
+            minOffcutLengthMm: 150,
+            plankDirection: .alongLength,
+            defaultPlankLengthMm: 1000,
+            defaultPlankWidthMm: 300,
+            defaultPricePerPlank: 10.0
+        )
+
+        let engine = LaminateEngine()
+        let result = engine.generateLayout(project: project, useStock: false)
+
+        // 1. Should have placed pieces
+        XCTAssertGreaterThan(result.placedPieces.count, 0)
+
+        // 2. All pieces should be 'needed' since stock is empty
+        XCTAssertEqual(result.installedAreaM2, 0, accuracy: 0.001)
+        XCTAssertGreaterThan(result.neededAreaM2, 0)
+
+        // 3. Area check: should be close to 20 m^2
+        // Usable area for this polygon with 0 gap is exactly 20 m^2
+        XCTAssertEqual(result.neededAreaM2, 20.0, accuracy: 0.5)
+
+        // 4. Verify piece placement within boundaries
+        // Room is:
+        // y in [0, 2000]: x in [0, 6000]
+        // y in [2000, 4000]: x in [2000, 6000]
+        for piece in result.placedPieces {
+            let midY = piece.y + piece.widthMm / 2
+            if midY < 2000 {
+                XCTAssertGreaterThanOrEqual(piece.x, 0)
+                XCTAssertLessThanOrEqual(piece.x + piece.lengthMm, 6000 + 0.1)
+            } else {
+                XCTAssertGreaterThanOrEqual(piece.x, 2000 - 0.1)
+                XCTAssertLessThanOrEqual(piece.x + piece.lengthMm, 6000 + 0.1)
+            }
+        }
+
+        // 5. Verify start/end cuts are generated at polygon boundaries
+        // For the L-shape, we expect some pieces to start at x=2000 for y >= 2000
+        let transitionRowPieces = result.placedPieces.filter { $0.y >= 2000 && abs($0.x - 2000) < 1.0 }
+        XCTAssertGreaterThan(transitionRowPieces.count, 0, "Should have pieces starting at the inner corner of the L-shape")
+    }
     
     // MARK: - Tile Engine Tests
     
@@ -238,8 +310,8 @@ final class FloorPlannerTests: XCTestCase {
             polygonPoints: lShapePoints
         )
         
-        // Expected area: (6m × 4m) - (4m × 2m) = 24 - 8 = 16 m²
-        XCTAssertEqual(lShapeRoom.grossAreaM2, 16.0, accuracy: 0.1)
+        // Expected area: (6m × 4m) - (2m × 2m) = 24 - 4 = 20 m²
+        XCTAssertEqual(lShapeRoom.grossAreaM2, 20.0, accuracy: 0.1)
     }
     
     func testPolygonRoomPointInside() {
