@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import OSLog
 
 // MARK: - Module-level globals for async-signal-safe signal handler access
 //
@@ -37,12 +38,20 @@ final class DiagnosticsManager {
 
     static let shared = DiagnosticsManager()
 
+    private let logger: Logger
     let logsDirectory: URL
 
     private init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         logsDirectory = docs.appendingPathComponent("DiagnosticLogs", isDirectory: true)
         try? FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
+
+        if #available(iOS 14.0, macOS 11.0, *) {
+            self.logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "FloorPlanner", category: "Diagnostics")
+        } else {
+            // Dummy logger for older platforms
+            self.logger = Logger(OSLog.disabled)
+        }
     }
 
     // MARK: - Install (call once at app startup, before any other code runs)
@@ -76,16 +85,54 @@ final class DiagnosticsManager {
 
     // MARK: - App-level error logging
 
-    func log(error: Error, context: String) {
+    @discardableResult
+    func log(error: Error, context: String? = nil) -> String {
+        let message = "Error\(context.map { " [\($0)]" } ?? ""): \(error.localizedDescription)"
+        if #available(iOS 14.0, macOS 11.0, *) {
+            logger.error("\(message, privacy: .public)")
+        } else {
+            print("[Diagnostics] \(message)")
+        }
+
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let content = """
         --- Error Report ---
         Date:    \(timestamp)
-        Context: \(context)
+        Context: \(context ?? "None")
         Error:   \(error.localizedDescription)
         Detail:  \(String(describing: error))
         """
         write(content: content, prefix: "error")
+
+        return message
+    }
+
+    /// Logs an arbitrary message with a level and optional context.
+    enum Level: String { case debug, info, warn, error }
+
+    func log(_ message: String, level: Level = .info, context: String? = nil) {
+        let composed = "\(level.rawValue.uppercased())\(context.map { " [\($0)]" } ?? ""): \(message)"
+        if #available(iOS 14.0, macOS 11.0, *) {
+            switch level {
+            case .debug: logger.debug("\(composed, privacy: .public)")
+            case .info:  logger.info("\(composed, privacy: .public)")
+            case .warn:  logger.warning("\(composed, privacy: .public)")
+            case .error: logger.error("\(composed, privacy: .public)")
+            }
+        } else {
+            print("[Diagnostics] \(composed)")
+        }
+    }
+
+    /// Records a named event with optional metadata for analytics/debugging.
+    func event(_ name: String, metadata: [String: String] = [:], context: String? = nil) {
+        let metaString = metadata.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: ", ")
+        let composed = metaString.isEmpty ? name : "\(name) {\(metaString)}"
+        if #available(iOS 14.0, macOS 11.0, *) {
+            logger.log("EVENT\(context.map { " [\($0)]" } ?? ""): \(composed, privacy: .public)")
+        } else {
+            print("[Diagnostics] EVENT\(context.map { " [\($0)]" } ?? ""): \(composed)")
+        }
     }
 
     // MARK: - Log management
