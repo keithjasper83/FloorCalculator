@@ -155,6 +155,24 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(area, 0.4, accuracy: 0.01) // 2 pieces * 1000*200 / 1_000_000
     }
     
+    func testCalculateSurplus() {
+        // Test normal surplus calculation
+        let normalSurplus = LayoutUtilities.calculateSurplus(stockAreaM2: 10.0, installedAreaM2: 5.0, wasteAreaM2: 2.0)
+        XCTAssertEqual(normalSurplus, 3.0, accuracy: 0.01)
+
+        // Test zero values
+        let zeroSurplus = LayoutUtilities.calculateSurplus(stockAreaM2: 0.0, installedAreaM2: 0.0, wasteAreaM2: 0.0)
+        XCTAssertEqual(zeroSurplus, 0.0, accuracy: 0.01)
+
+        // Test shortfall (negative surplus)
+        let shortfall = LayoutUtilities.calculateSurplus(stockAreaM2: 5.0, installedAreaM2: 6.0, wasteAreaM2: 1.0)
+        XCTAssertEqual(shortfall, -2.0, accuracy: 0.01)
+
+        // Test exact fit
+        let exactFit = LayoutUtilities.calculateSurplus(stockAreaM2: 10.0, installedAreaM2: 8.0, wasteAreaM2: 2.0)
+        XCTAssertEqual(exactFit, 0.0, accuracy: 0.01)
+    }
+
     // MARK: - Persistence Tests
     
     func testProjectCoding() throws {
