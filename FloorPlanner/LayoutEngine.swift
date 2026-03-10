@@ -75,16 +75,12 @@ struct LayoutUtilities {
     
     /// Calculate installed area from placed pieces
     static func calculateInstalledArea(pieces: [PlacedPiece]) -> Double {
-        pieces
-            .filter { $0.status == .installed }
-            .reduce(0.0) { $0 + $1.areaM2 }
+        pieces.reduce(0.0) { $0 + ($1.status == .installed ? $1.areaM2 : 0.0) }
     }
     
     /// Calculate needed area from placed pieces
     static func calculateNeededArea(pieces: [PlacedPiece]) -> Double {
-        pieces
-            .filter { $0.status == .needed }
-            .reduce(0.0) { $0 + $1.areaM2 }
+        pieces.reduce(0.0) { $0 + ($1.status == .needed ? $1.areaM2 : 0.0) }
     }
     
     /// Calculate waste area from remaining pieces

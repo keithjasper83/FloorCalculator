@@ -205,7 +205,7 @@ class TileEngine: LayoutEngine {
         var purchaseSuggestions: [PurchaseSuggestion] = []
         var purchaseCost = 0.0
 
-        let neededTiles = placedPieces.filter { $0.status == .needed }.count
+        let neededTiles = placedPieces.lazy.filter { $0.status == .needed }.count
         if neededTiles > 0 {
             let wasteFactor = 1.0 + (project.wasteFactor / 100.0)
             let neededWithWaste = Int(ceil(Double(neededTiles) * wasteFactor))

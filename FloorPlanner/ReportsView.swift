@@ -145,8 +145,8 @@ struct ReportsView: View {
                         // Placement Statistics
                         GroupBox("Placement Statistics") {
                             VStack(alignment: .leading, spacing: 8) {
-                                let installedCount = result.placedPieces.filter { $0.status == .installed }.count
-                                let neededCount = result.placedPieces.filter { $0.status == .needed }.count
+                                let installedCount = result.placedPieces.lazy.filter { $0.status == .installed }.count
+                                let neededCount = result.placedPieces.lazy.filter { $0.status == .needed }.count
 
                                 reportRow("Pieces Installed", value: "\(installedCount)")
                                 if neededCount > 0 {
