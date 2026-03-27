@@ -217,14 +217,37 @@ final class FloorPlannerTests: XCTestCase {
     }
     
     func testCalculateInstalledArea() {
-        let pieces = [
+        // Test with empty array
+        XCTAssertEqual(LayoutUtilities.calculateInstalledArea(pieces: []), 0.0, accuracy: 0.01)
+
+        // Test with only needed pieces (should be 0)
+        let neededPieces = [
+            PlacedPiece(x: 0, y: 0, lengthMm: 1000, widthMm: 200, label: "1", source: .needed, status: .needed, rotation: 0),
+            PlacedPiece(x: 1000, y: 0, lengthMm: 1000, widthMm: 200, label: "2", source: .needed, status: .needed, rotation: 0)
+        ]
+        XCTAssertEqual(LayoutUtilities.calculateInstalledArea(pieces: neededPieces), 0.0, accuracy: 0.01)
+
+        // Test with all installed pieces
+        let allInstalledPieces = [
+            PlacedPiece(x: 0, y: 0, lengthMm: 1000, widthMm: 200, label: "1", source: .stock, status: .installed, rotation: 0),
+            PlacedPiece(x: 1000, y: 0, lengthMm: 1000, widthMm: 200, label: "2", source: .stock, status: .installed, rotation: 0)
+        ]
+        XCTAssertEqual(LayoutUtilities.calculateInstalledArea(pieces: allInstalledPieces), 0.4, accuracy: 0.01)
+
+        // Test with zero area pieces (edge case)
+        let zeroAreaPieces = [
+            PlacedPiece(x: 0, y: 0, lengthMm: 0, widthMm: 200, label: "1", source: .stock, status: .installed, rotation: 0),
+            PlacedPiece(x: 0, y: 0, lengthMm: 1000, widthMm: 0, label: "2", source: .stock, status: .installed, rotation: 0)
+        ]
+        XCTAssertEqual(LayoutUtilities.calculateInstalledArea(pieces: zeroAreaPieces), 0.0, accuracy: 0.01)
+
+        // Test mixed array (installed, needed)
+        let mixedPieces = [
             PlacedPiece(x: 0, y: 0, lengthMm: 1000, widthMm: 200, label: "1", source: .stock, status: .installed, rotation: 0),
             PlacedPiece(x: 1000, y: 0, lengthMm: 1000, widthMm: 200, label: "2", source: .stock, status: .installed, rotation: 0),
             PlacedPiece(x: 2000, y: 0, lengthMm: 1000, widthMm: 200, label: "3", source: .needed, status: .needed, rotation: 0)
         ]
-        
-        let area = LayoutUtilities.calculateInstalledArea(pieces: pieces)
-        XCTAssertEqual(area, 0.4, accuracy: 0.01) // 2 pieces * 1000*200 / 1_000_000
+        XCTAssertEqual(LayoutUtilities.calculateInstalledArea(pieces: mixedPieces), 0.4, accuracy: 0.01)
     }
     
     func testCalculateSurplus() {
