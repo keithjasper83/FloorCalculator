@@ -231,11 +231,17 @@ struct RoomSettings: Codable, Equatable {
         for i in 0..<n {
             let xi = polygonPoints[i].x
             let yi = polygonPoints[i].y
-            let xj = polygonPoints[j].x
             let yj = polygonPoints[j].y
             
-            if ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-                inside = !inside
+            if (yi > y) != (yj > y) {
+                let xj = polygonPoints[j].x
+                if xi > x && xj > x {
+                    inside = !inside
+                } else if xi >= x || xj >= x {
+                    if x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+                        inside = !inside
+                    }
+                }
             }
             j = i
         }
