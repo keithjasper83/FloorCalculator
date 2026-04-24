@@ -27,11 +27,6 @@ private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [Floor
     var current = remaining.removeFirst().0
     var path: [FloorPoint] = [current]
 
-    func dist2(_ a: FloorPoint, _ b: FloorPoint) -> Float {
-        let dx = a.x - b.x; let dy = a.y - b.y
-        return dx*dx + dy*dy
-    }
-
     let maxIter = segments.count * 4
     for _ in 0..<maxIter {
         guard !remaining.isEmpty else { break }
@@ -39,9 +34,28 @@ private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [Floor
         var bestNext: FloorPoint?
         var bestScore: Float = .infinity
 
+        let cx = current.x
+        let cy = current.y
+
         for (idx, seg) in remaining.enumerated() {
-            let d0 = dist2(current, seg.0)
-            let d1 = dist2(current, seg.1)
+            let dx0 = cx - seg.0.x
+            let dy0 = cy - seg.0.y
+            let d0 = dx0*dx0 + dy0*dy0
+
+            if d0 < 0.0001 { // Early exit if essentially identical (< 1cm)
+                bestScore = d0; bestNext = seg.1; bestIdx = idx
+                break
+            }
+
+            let dx1 = cx - seg.1.x
+            let dy1 = cy - seg.1.y
+            let d1 = dx1*dx1 + dy1*dy1
+
+            if d1 < 0.0001 { // Early exit
+                bestScore = d1; bestNext = seg.0; bestIdx = idx
+                break
+            }
+
             if d0 < bestScore { bestScore = d0; bestNext = seg.1; bestIdx = idx }
             if d1 < bestScore { bestScore = d1; bestNext = seg.0; bestIdx = idx }
         }
@@ -49,8 +63,14 @@ private func chainWallSegments(_ segments: [(FloorPoint, FloorPoint)]) -> [Floor
         guard let idx = bestIdx, let next = bestNext else { break }
         current = next
         path.append(current)
-        remaining.remove(at: idx)
-        if path.count >= 3, dist2(current, path[0]) < 0.01 { break }
+
+        // O(1) removal using swapAt instead of O(n) remove(at:)
+        remaining.swapAt(idx, remaining.count - 1)
+        remaining.removeLast()
+
+        let px = path[0].x - current.x
+        let py = path[0].y - current.y
+        if path.count >= 3, (px*px + py*py) < 0.01 { break }
     }
 
     if path.count >= 2, path.first == path.last { path.removeLast() }
