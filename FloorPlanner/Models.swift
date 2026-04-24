@@ -103,7 +103,35 @@ struct RoomSettings: Codable, Equatable {
     var angleDegrees: Double = 0.0
 
     // Polygon mode properties
-    var polygonPoints: [RoomPoint]
+    var polygonPoints: [RoomPoint] {
+        didSet {
+            updatePolygonBounds()
+        }
+    }
+
+    // Cached polygon bounds
+    private(set) var minX: Double = 0
+    private(set) var maxX: Double = 0
+    private(set) var minY: Double = 0
+    private(set) var maxY: Double = 0
+
+    // Exclude cached bounds from Codable
+    enum CodingKeys: String, CodingKey {
+        case shape, lengthMm, widthMm, expansionGapMm, patternType, angleDegrees, polygonPoints
+    }
+
+    // Custom Decodable init to re-calculate bounds on load
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        shape = try container.decode(RoomShape.self, forKey: .shape)
+        lengthMm = try container.decode(Double.self, forKey: .lengthMm)
+        widthMm = try container.decode(Double.self, forKey: .widthMm)
+        expansionGapMm = try container.decode(Double.self, forKey: .expansionGapMm)
+        patternType = try container.decode(InstallationPattern.self, forKey: .patternType)
+        angleDegrees = try container.decode(Double.self, forKey: .angleDegrees)
+        polygonPoints = try container.decode([RoomPoint].self, forKey: .polygonPoints)
+        updatePolygonBounds()
+    }
     
     // Computed bounding box (works for both modes)
     var boundingLengthMm: Double {
@@ -162,6 +190,28 @@ struct RoomSettings: Codable, Equatable {
         self.polygonPoints = polygonPoints
         self.patternType = patternType
         self.angleDegrees = angleDegrees
+        updatePolygonBounds()
+    }
+
+    private mutating func updatePolygonBounds() {
+        guard !polygonPoints.isEmpty else {
+            minX = 0
+            maxX = 0
+            minY = 0
+            maxY = 0
+            return
+        }
+        minX = polygonPoints[0].x
+        maxX = polygonPoints[0].x
+        minY = polygonPoints[0].y
+        maxY = polygonPoints[0].y
+
+        for p in polygonPoints {
+            if p.x < minX { minX = p.x }
+            if p.x > maxX { maxX = p.x }
+            if p.y < minY { minY = p.y }
+            if p.y > maxY { maxY = p.y }
+        }
     }
     
     // Calculate polygon area using shoelace formula
@@ -224,6 +274,11 @@ struct RoomSettings: Codable, Equatable {
     private func pointInPolygon(x: Double, y: Double) -> Bool {
         guard polygonPoints.count >= 3 else { return false }
         
+        // Fast bounds check
+        if x < minX || x > maxX || y < minY || y > maxY {
+            return false
+        }
+
         var inside = false
         let n = polygonPoints.count
         
@@ -234,8 +289,17 @@ struct RoomSettings: Codable, Equatable {
             let xj = polygonPoints[j].x
             let yj = polygonPoints[j].y
             
-            if ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-                inside = !inside
+            if ((yi > y) != (yj > y)) {
+                if x < xi && x < xj {
+                    // Ray intersects to the right of both points
+                    inside.toggle()
+                } else if x < xi || x < xj {
+                    // Potential intersection, calculate exact x-crossing
+                    let intersectX = (xj - xi) * (y - yi) / (yj - yi) + xi
+                    if x < intersectX {
+                        inside.toggle()
+                    }
+                }
             }
             j = i
         }
