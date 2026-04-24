@@ -538,3 +538,79 @@ final class FloorPlannerTests: XCTestCase {
     }
 }
 
+// MARK: - Report Exporter Tests
+
+final class ReportExporterTests: XCTestCase {
+
+    enum MockError: Error {
+        case writeFailed
+    }
+
+    func testExportFilesSuccess() {
+        var exporter = ReportsView.ReportFileExporter()
+
+        var writtenFiles: [(URL, Data.WritingOptions)] = []
+        exporter.fileWriter = { data, url, options in
+            writtenFiles.append((url, options))
+        }
+
+        let files: [(name: String, data: Data)] = [
+            ("file1.csv", Data("test1".utf8)),
+            ("file2.csv", Data("test2".utf8))
+        ]
+        let directory = URL(fileURLWithPath: "/tmp/export_test")
+
+        let urls = exporter.exportFiles(files: files, to: directory)
+
+        XCTAssertEqual(urls.count, 2)
+        XCTAssertEqual(urls[0].lastPathComponent, "file1.csv")
+        XCTAssertEqual(urls[1].lastPathComponent, "file2.csv")
+        XCTAssertEqual(writtenFiles.count, 2)
+        XCTAssertTrue(writtenFiles[0].1.contains(.atomic))
+
+        #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+        XCTAssertTrue(writtenFiles[0].1.contains(.completeFileProtection))
+        #endif
+    }
+
+    func testExportFilesPartialFailure() {
+        var exporter = ReportsView.ReportFileExporter()
+
+        exporter.fileWriter = { data, url, options in
+            if url.lastPathComponent == "file1.csv" {
+                throw MockError.writeFailed
+            }
+        }
+
+        let files: [(name: String, data: Data)] = [
+            ("file1.csv", Data("test1".utf8)),
+            ("file2.csv", Data("test2".utf8))
+        ]
+        let directory = URL(fileURLWithPath: "/tmp/export_test")
+
+        let urls = exporter.exportFiles(files: files, to: directory)
+
+        // file1 should fail and be skipped silently
+        XCTAssertEqual(urls.count, 1)
+        XCTAssertEqual(urls[0].lastPathComponent, "file2.csv")
+    }
+
+    func testExportFilesCompleteFailure() {
+        var exporter = ReportsView.ReportFileExporter()
+
+        exporter.fileWriter = { data, url, options in
+            throw MockError.writeFailed
+        }
+
+        let files: [(name: String, data: Data)] = [
+            ("file1.csv", Data("test1".utf8)),
+            ("file2.csv", Data("test2".utf8))
+        ]
+        let directory = URL(fileURLWithPath: "/tmp/export_test")
+
+        let urls = exporter.exportFiles(files: files, to: directory)
+
+        // All writes fail, so the array should be empty
+        XCTAssertTrue(urls.isEmpty)
+    }
+}
