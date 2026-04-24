@@ -245,6 +245,35 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(exactFit, 0.0, accuracy: 0.01)
     }
 
+    func testLayoutUtilitiesOverlaps() {
+        // Base rectangle: 100x50 at (10, 10)
+        let rect1 = (x: 10.0, y: 10.0, length: 100.0, width: 50.0)
+
+        // 1. Non-overlapping rectangles (completely separated)
+        let rect2 = (x: 150.0, y: 10.0, length: 100.0, width: 50.0)
+        XCTAssertFalse(LayoutUtilities.overlaps(piece1: rect1, piece2: rect2))
+
+        // 2. Overlapping rectangles (intersecting)
+        let rect3 = (x: 50.0, y: 20.0, length: 100.0, width: 50.0)
+        XCTAssertTrue(LayoutUtilities.overlaps(piece1: rect1, piece2: rect3))
+
+        // 3. Perfectly adjacent rectangles sharing an edge
+        // Right edge
+        let rect4 = (x: 110.0, y: 10.0, length: 100.0, width: 50.0)
+        XCTAssertFalse(LayoutUtilities.overlaps(piece1: rect1, piece2: rect4))
+        // Top edge
+        let rect5 = (x: 10.0, y: 60.0, length: 100.0, width: 50.0)
+        XCTAssertFalse(LayoutUtilities.overlaps(piece1: rect1, piece2: rect5))
+
+        // 4. Perfectly adjacent rectangles sharing a corner
+        let rect6 = (x: 110.0, y: 60.0, length: 100.0, width: 50.0)
+        XCTAssertFalse(LayoutUtilities.overlaps(piece1: rect1, piece2: rect6))
+
+        // 5. One rectangle completely inside another
+        let rect7 = (x: 20.0, y: 20.0, length: 50.0, width: 20.0)
+        XCTAssertTrue(LayoutUtilities.overlaps(piece1: rect1, piece2: rect7))
+    }
+
     // MARK: - Persistence Tests
     
     func testProjectCoding() throws {
