@@ -188,6 +188,31 @@ struct ReportsView: View {
         }
     }
     
+    struct ReportFileExporter {
+        var fileWriter: (Data, URL, Data.WritingOptions) throws -> Void = { data, url, options in
+            try data.write(to: url, options: options)
+        }
+
+        func exportFiles(files: [(name: String, data: Data)], to directory: URL) -> [URL] {
+            var urls: [URL] = []
+            for file in files {
+                let url = directory.appendingPathComponent(file.name)
+                do {
+                    #if os(macOS)
+                    let options: Data.WritingOptions = .atomic
+                    #else
+                    let options: Data.WritingOptions = [.atomic, .completeFileProtection]
+                    #endif
+                    try fileWriter(file.data, url, options)
+                    urls.append(url)
+                } catch {
+                    // Skip failed writes silently
+                }
+            }
+            return urls
+        }
+    }
+
     private func exportAllCSVs() {
         guard let result = appState.layoutResult else { return }
 
@@ -204,6 +229,8 @@ struct ReportsView: View {
             ("\(baseName) - Purchases.csv", Data(purchaseCSV.utf8))
         ]
 
+        let exporter = ReportFileExporter()
+
         #if os(macOS)
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -212,23 +239,11 @@ struct ReportsView: View {
         panel.prompt = "Choose"
         panel.title = "Select Export Folder"
         if panel.runModal() == .OK, let folderURL = panel.url {
-            for file in files {
-                let url = folderURL.appendingPathComponent(file.name)
-                try? file.data.write(to: url, options: .atomic)
-            }
+            _ = exporter.exportFiles(files: files, to: folderURL)
         }
         #else
         let tempDir = FileManager.default.temporaryDirectory
-        var urls: [URL] = []
-        for file in files {
-            let url = tempDir.appendingPathComponent(file.name)
-            do {
-                try file.data.write(to: url, options: .atomic)
-                urls.append(url)
-            } catch {
-                // Skip failed writes silently
-            }
-        }
+        let urls = exporter.exportFiles(files: files, to: tempDir)
         guard !urls.isEmpty else { return }
 
         let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
