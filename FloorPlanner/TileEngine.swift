@@ -59,6 +59,7 @@ class TileEngine: LayoutEngine {
         var edgeCutCount = 0
         var tilesUsed = 0
         var usedStockCost = 0.0
+        var neededTilesCount = 0
 
         // Calculate offset for room coordinates (for polygon check)
         var minX = 0.0
@@ -136,6 +137,7 @@ class TileEngine: LayoutEngine {
                 } else {
                     source = .needed
                     status = .needed
+                    neededTilesCount += 1
                 }
                 
                 let label = status == .installed
@@ -205,10 +207,9 @@ class TileEngine: LayoutEngine {
         var purchaseSuggestions: [PurchaseSuggestion] = []
         var purchaseCost = 0.0
 
-        let neededTiles = placedPieces.lazy.filter { $0.status == .needed }.count
-        if neededTiles > 0 {
+        if neededTilesCount > 0 {
             let wasteFactor = 1.0 + (project.wasteFactor / 100.0)
-            let neededWithWaste = Int(ceil(Double(neededTiles) * wasteFactor))
+            let neededWithWaste = Int(ceil(Double(neededTilesCount) * wasteFactor))
             
             var packsNeeded: Int?
             if let tilesPerBox = settings.tilesPerBox, tilesPerBox > 0 {
