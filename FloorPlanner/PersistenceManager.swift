@@ -51,28 +51,72 @@ class PersistenceManager: ObservableObject {
             let backgroundContext = self.stack.container.newBackgroundContext()
             backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
-            // Parallel processing for performance
+            // Parallel decoding
+            let lock = NSLock()
+            var decodedProjects: [(Project, URL)] = []
+
             DispatchQueue.concurrentPerform(iterations: jsonFiles.count) { index in
                 let url = jsonFiles[index]
                 autoreleasepool {
                     do {
-                        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                        // Use empty options rather than mappedIfSafe per security directives
+                        let data = try Data(contentsOf: url, options: [])
                         let decoder = JSONDecoder()
                         decoder.dateDecodingStrategy = .iso8601
                         let project = try decoder.decode(Project.self, from: data)
 
-                        // Import into Core Data
-                        // Note: saveProject handles context.performAndWait for thread safety
-                        try self.saveProject(project, in: backgroundContext)
-
-                        // Move legacy file to backup or delete
-                        // For safety, let's rename extension to .migrated
-                        let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
-                        try? FileManager.default.removeItem(at: destination) // Remove if exists
-                        try FileManager.default.moveItem(at: url, to: destination)
+                        lock.lock()
+                        decodedProjects.append((project, url))
+                        lock.unlock()
                     } catch {
-                        // Silently fail or use a non-sensitive logging mechanism
+                        // Silently fail or log if appropriate
                     }
+                }
+            }
+
+            if decodedProjects.isEmpty { return }
+
+            // Batched Core Data insertion
+            backgroundContext.performAndWait {
+                do {
+                    let projectIds = decodedProjects.map { $0.0.id }
+                    let fetchRequest = NSFetchRequest<ProjectEntity>(entityName: "ProjectEntity")
+                    fetchRequest.predicate = NSPredicate(format: "id IN %@", projectIds)
+
+                    let results = try backgroundContext.fetch(fetchRequest)
+                    let existingEntities = Dictionary(
+                        results.compactMap { entity -> (UUID, ProjectEntity)? in
+                            guard let id = entity.id else { return nil }
+                            return (id, entity)
+                        },
+                        uniquingKeysWith: { (first, _) in first }
+                    )
+
+                    for (project, _) in decodedProjects {
+                        let entity: ProjectEntity
+                        if let existing = existingEntities[project.id] {
+                            entity = existing
+                        } else {
+                            entity = ProjectEntity(context: backgroundContext)
+                            entity.id = project.id
+                            entity.createdAt = project.createdAt
+                        }
+
+                        self.applyProjectData(project, to: entity, in: backgroundContext)
+                    }
+
+                    if backgroundContext.hasChanges {
+                        try backgroundContext.save()
+                    }
+
+                    // Move legacy files only after successful save to prevent data loss
+                    for (_, url) in decodedProjects {
+                        let destination = url.deletingPathExtension().appendingPathExtension("json.migrated")
+                        try? FileManager.default.removeItem(at: destination)
+                        try? FileManager.default.moveItem(at: url, to: destination)
+                    }
+                } catch {
+                    // Silently fail
                 }
             }
         }
@@ -99,29 +143,33 @@ class PersistenceManager: ObservableObject {
                 entity.createdAt = project.createdAt
             }
 
-            // Update attributes
-            entity.name = project.name
-            entity.currency = project.currency
-            entity.materialType = project.materialType.rawValue
-            entity.wasteFactor = project.wasteFactor
-            entity.layerThicknessMm = project.layers.first?.thicknessMm ?? 0.0
-            entity.modifiedAt = Date() // Update modified time on save
-
-            // Update relationships
-            updateRoomSettings(for: entity, from: project.roomSettings, context: context)
-            updateStockItems(for: entity, from: project.stockItems, context: context)
-
-            if let laminateSettings = project.laminateSettings {
-                updateLaminateSettings(for: entity, from: laminateSettings, context: context)
-            }
-
-            if let tileSettings = project.tileSettings {
-                updateTileSettings(for: entity, from: tileSettings, context: context)
-            }
+            applyProjectData(project, to: entity, in: context)
 
             if context.hasChanges {
                 try context.save()
             }
+        }
+    }
+
+    private func applyProjectData(_ project: Project, to entity: ProjectEntity, in context: NSManagedObjectContext) {
+        // Update attributes
+        entity.name = project.name
+        entity.currency = project.currency
+        entity.materialType = project.materialType.rawValue
+        entity.wasteFactor = project.wasteFactor
+        entity.layerThicknessMm = project.layers.first?.thicknessMm ?? 0.0
+        entity.modifiedAt = Date() // Update modified time on save
+
+        // Update relationships
+        updateRoomSettings(for: entity, from: project.roomSettings, context: context)
+        updateStockItems(for: entity, from: project.stockItems, context: context)
+
+        if let laminateSettings = project.laminateSettings {
+            updateLaminateSettings(for: entity, from: laminateSettings, context: context)
+        }
+
+        if let tileSettings = project.tileSettings {
+            updateTileSettings(for: entity, from: tileSettings, context: context)
         }
     }
     
