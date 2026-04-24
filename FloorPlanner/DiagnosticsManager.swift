@@ -66,10 +66,9 @@ final class DiagnosticsManager {
         // Use count-1 as the copy limit to guarantee space for the null terminator.
         let signalCrashPath = logsDirectory.appendingPathComponent("crash_signal_pending.txt").path
         signalCrashPath.withCString { ptr in
-            let len = strlen(ptr)
-            let copyLen = min(len, gSignalCrashLogPath.count - 1)
-            _ = memcpy(&gSignalCrashLogPath, ptr, copyLen)
-            gSignalCrashLogPath[Int(copyLen)] = 0
+            let maxLen = gSignalCrashLogPath.count - 1
+            _ = strncpy(&gSignalCrashLogPath, ptr, maxLen)
+            gSignalCrashLogPath[maxLen] = 0
         }
 
         // Uncaught Objective-C / Swift exception handler (Foundation-safe context)
