@@ -227,6 +227,16 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(area, 0.4, accuracy: 0.01) // 2 pieces * 1000*200 / 1_000_000
     }
     
+    func testCalculateWasteArea() {
+        let remainingPieces = [
+            RemainingPiece(lengthMm: 1000, widthMm: 200, source: .offcut),
+            RemainingPiece(lengthMm: 500, widthMm: 200, source: .stock)
+        ]
+
+        let area = LayoutUtilities.calculateWasteArea(remainingPieces: remainingPieces)
+        XCTAssertEqual(area, 0.3, accuracy: 0.01) // (1000*200 + 500*200) / 1_000_000
+    }
+
     func testCalculateSurplus() {
         // Test normal surplus calculation
         let normalSurplus = LayoutUtilities.calculateSurplus(stockAreaM2: 10.0, installedAreaM2: 5.0, wasteAreaM2: 2.0)
