@@ -26,6 +26,41 @@ final class FloorPlannerTests: XCTestCase {
         XCTAssertEqual(item.areaM2, 6.0, accuracy: 0.01)
     }
     
+    func testCalculatePerimeter() {
+        // Test edge cases: 0 or 1 point polygons should return 0 perimeter
+        let emptyRoom = RoomSettings(shape: .polygon, polygonPoints: [])
+        XCTAssertEqual(emptyRoom.calculatePerimeter(), 0.0, accuracy: 0.01)
+
+        let pointRoom = RoomSettings(shape: .polygon, polygonPoints: [RoomPoint(x: 0, y: 0)])
+        XCTAssertEqual(pointRoom.calculatePerimeter(), 0.0, accuracy: 0.01)
+
+        // Test a 3x4 right triangle (perimeter = 3 + 4 + 5 = 12)
+        // Scaled by 1000 to simulate mm
+        let triangleRoom = RoomSettings(
+            shape: .polygon,
+            polygonPoints: [
+                RoomPoint(x: 0, y: 0),
+                RoomPoint(x: 3000, y: 0),
+                RoomPoint(x: 0, y: 4000)
+            ]
+        )
+        // 3000 + 4000 + 5000 = 12000
+        XCTAssertEqual(triangleRoom.calculatePerimeter(), 12000.0, accuracy: 0.01)
+
+        // Test a 5x4 rectangle (perimeter = 5 + 4 + 5 + 4 = 18)
+        let rectangleRoom = RoomSettings(
+            shape: .polygon,
+            polygonPoints: [
+                RoomPoint(x: 0, y: 0),
+                RoomPoint(x: 5000, y: 0),
+                RoomPoint(x: 5000, y: 4000),
+                RoomPoint(x: 0, y: 4000)
+            ]
+        )
+        // 5000 + 4000 + 5000 + 4000 = 18000
+        XCTAssertEqual(rectangleRoom.calculatePerimeter(), 18000.0, accuracy: 0.01)
+    }
+
     // MARK: - Laminate Engine Tests
     
     func testLaminateEngineWithStock() {
