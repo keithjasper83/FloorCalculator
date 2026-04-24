@@ -212,23 +212,14 @@ struct ReportsView: View {
         panel.prompt = "Choose"
         panel.title = "Select Export Folder"
         if panel.runModal() == .OK, let folderURL = panel.url {
-            for file in files {
-                let url = folderURL.appendingPathComponent(file.name)
-                try? file.data.write(to: url, options: .atomic)
-            }
+            let exporter = ReportFileExporter()
+            _ = exporter.writeFiles(files: files, to: folderURL)
         }
         #else
         let tempDir = FileManager.default.temporaryDirectory
-        var urls: [URL] = []
-        for file in files {
-            let url = tempDir.appendingPathComponent(file.name)
-            do {
-                try file.data.write(to: url, options: .atomic)
-                urls.append(url)
-            } catch {
-                // Skip failed writes silently
-            }
-        }
+        let exporter = ReportFileExporter()
+        let urls = exporter.writeFiles(files: files, to: tempDir)
+
         guard !urls.isEmpty else { return }
 
         let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
