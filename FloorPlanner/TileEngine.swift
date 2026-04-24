@@ -63,9 +63,13 @@ class TileEngine: LayoutEngine {
         // Calculate offset for room coordinates (for polygon check)
         var minX = 0.0
         var minY = 0.0
-        if room.shape == .polygon {
-             minX = room.polygonPoints.map { $0.x }.min() ?? 0
-             minY = room.polygonPoints.map { $0.y }.min() ?? 0
+        if room.shape == .polygon && !room.polygonPoints.isEmpty {
+             minX = Double.infinity
+             minY = Double.infinity
+             for point in room.polygonPoints {
+                 if point.x < minX { minX = point.x }
+                 if point.y < minY { minY = point.y }
+             }
         }
         let roomOriginX = minX + room.expansionGapMm
         let roomOriginY = minY + room.expansionGapMm
