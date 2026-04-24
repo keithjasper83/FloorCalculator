@@ -181,7 +181,7 @@ struct RoomSettings: Codable, Equatable {
     }
     
     // Calculate polygon perimeter
-    private func calculatePerimeter() -> Double {
+    func calculatePerimeter() -> Double {
         guard polygonPoints.count >= 2 else { return 0 }
         
         var perimeter: Double = 0
