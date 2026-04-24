@@ -231,8 +231,8 @@ See [USER_GUIDE.md](./USER_GUIDE.md) for:
 ## Known Limitations
 
 ### Future Enhancements
-- [ ] PNG export UI integration (core logic present)
-- [ ] ShareSheet/NSSavePanel UI (export ready)
+- [x] PNG export UI integration (core logic present)
+- [x] ShareSheet/NSSavePanel UI (export ready)
 - [ ] Project browser
 - [ ] Undo/redo
 - [ ] Cost tracking

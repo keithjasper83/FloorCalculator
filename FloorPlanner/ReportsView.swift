@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
@@ -16,6 +17,9 @@ import UIKit
 
 struct ReportsView: View {
     @EnvironmentObject var appState: AppState
+    @State private var isExporting = false
+    @State private var exportDocument: CSVDirectoryDocument?
+
     
     var body: some View {
         ScrollView {
@@ -166,6 +170,14 @@ struct ReportsView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
+                        .fileExporter(
+                            isPresented: $isExporting,
+                            document: exportDocument,
+                            contentType: .folder,
+                            defaultFilename: "\(appState.currentProject.name.replacingOccurrences(of: "/", with: "-")) Reports"
+                        ) { result in
+                            // Handle export result if needed
+                        }
                     }
                     .padding()
                 }
@@ -204,44 +216,8 @@ struct ReportsView: View {
             ("\(baseName) - Purchases.csv", Data(purchaseCSV.utf8))
         ]
 
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
-        panel.title = "Select Export Folder"
-        if panel.runModal() == .OK, let folderURL = panel.url {
-            for file in files {
-                let url = folderURL.appendingPathComponent(file.name)
-                try? file.data.write(to: url, options: .atomic)
-            }
-        }
-        #else
-        let tempDir = FileManager.default.temporaryDirectory
-        var urls: [URL] = []
-        for file in files {
-            let url = tempDir.appendingPathComponent(file.name)
-            do {
-                try file.data.write(to: url, options: .atomic)
-                urls.append(url)
-            } catch {
-                // Skip failed writes silently
-            }
-        }
-        guard !urls.isEmpty else { return }
-
-        let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            if let popover = activityVC.popoverPresentationController {
-                popover.sourceView = rootVC.view
-                popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
-                popover.permittedArrowDirections = []
-            }
-            rootVC.present(activityVC, animated: true)
-        }
-        #endif
+        self.exportDocument = CSVDirectoryDocument(files: files)
+        self.isExporting = true
     }
 }
 
@@ -260,5 +236,29 @@ struct ReportsView: View {
         appState: PreviewFactory.appState(materialType: .paint, includeLayout: true)
     ) {
         ReportsView()
+    }
+}
+
+struct CSVDirectoryDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.folder] }
+
+    var files: [(name: String, data: Data)]
+
+    init(files: [(name: String, data: Data)]) {
+        self.files = files
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        self.files = []
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let directoryWrapper = FileWrapper(directoryWithFileWrappers: [:])
+        for file in files {
+            let fileWrapper = FileWrapper(regularFileWithContents: file.data)
+            fileWrapper.preferredFilename = file.name
+            directoryWrapper.addFileWrapper(fileWrapper)
+        }
+        return directoryWrapper
     }
 }
